@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
@@ -28,7 +30,9 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  final writeController = TextEditingController();
+  BluetoothDevice? connectedDevice;
+  List<BluetoothService> services = <BluetoothService>[];
 
   ListView buildBluetoothDeviceView() {
     List<Container> containers = <Container>[];
@@ -48,7 +52,24 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               FlatButton(
                 color:Colors.blue,
-                onPressed: () {  },
+                onPressed: () {
+                  setState(() async {
+                    widget.flutterBlue.stopScan();
+                    try {
+                      await device.connect();
+                    }
+                    catch(e) {
+                      if(e.toString() != 'already_connected') {
+                        rethrow;
+                      }
+                    }
+                    finally {
+                      services = await device.discoverServices();
+                    }
+
+                    connectedDevice = device;
+                  });
+                },
                 child: const Text(
                   'Connect',
                 style: TextStyle(color: Colors.white)),
@@ -76,11 +97,42 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+  ListView buildConnectedDeviceView() {
+    List<Container> containers = <Container>[];
+    for(BluetoothService service in services) {
+      containers.add(
+        Container(
+          height: 50,
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  children: <Widget>[
+                    Text(service.uuid.toString()),
+                  ],
+                )
+              )
+            ],
+          ),
+        )
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: <Widget>[
+        ...containers,
+      ],
+    );
   }
+
+  ListView buildView() {
+    if(connectedDevice != null) {
+      return buildConnectedDeviceView();
+    }
+    return buildBluetoothDeviceView();
+  }
+
 
   // Initialize the state of the bluetooth list. Scan for devices.
   @override
@@ -105,6 +157,6 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: buildBluetoothDeviceView(),
+      body: buildView(),
     );
 }
