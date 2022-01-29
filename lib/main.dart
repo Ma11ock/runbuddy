@@ -117,31 +117,6 @@ class _MyHomePageState extends State<MyHomePage> {
   List<ButtonTheme> _buildReadWriteNotifyButton(
       BluetoothCharacteristic characteristic) {
     List<ButtonTheme> buttons = <ButtonTheme>[];
-
-    if (characteristic.properties.read) {
-      buttons.add(
-        ButtonTheme(
-          minWidth: 10,
-          height: 20,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: RaisedButton(
-              color: Colors.blue,
-              child: const Text('READ', style: const TextStyle(color: Colors.white)),
-              onPressed: () async {
-                var sub = characteristic.value.listen((value) {
-                  setState(() {
-                    widget.readValues[characteristic.uuid] = value;
-                  });
-                });
-                List<int> btData = await characteristic.read();
-                sub.cancel();
-              },
-            ),
-          ),
-        ),
-      );
-    }
     if (characteristic.properties.write) {
       buttons.add(
         ButtonTheme(
@@ -234,13 +209,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 Row(
                   children: <Widget>[
-                    ..._buildReadWriteNotifyButton(characteristic),
-                  ],
-                ),
-                Row(
-                  children: <Widget>[
-                    Text('Value: ' +
-                        widget.readValues[characteristic.uuid].toString()),
+                    //..._buildReadWriteNotifyButton(characteristic),
+                    JSONScreen(device: _connectedDevice!, characteristic: characteristic),
                   ],
                 ),
                 const Divider(),
@@ -284,8 +254,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class JSONScreen extends StatefulWidget {
   final BluetoothDevice device;
-  final List<BluetoothService> services;
-  const JSONScreen({Key? key, required this.device, required this.services}) :
+  final BluetoothCharacteristic characteristic;
+  final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
+  JSONScreen({Key? key, required this.device,
+    required this.characteristic}) :
         super(key: key);
 
   @override
@@ -301,19 +273,11 @@ class JSONScreenState extends State<JSONScreen> {
   int timeIntervalMs = 1000;
 
   Timer createReadTimer(Duration d) {
-    final Map<String, dynamic> readResponse = {} as Map<String, dynamic>;
+    final Map<String, dynamic> readResponse = {};
     return Timer.periodic(d, (Timer t) {
       setState(() async {
-        // TODO read from the bluetooth device.
-        int widgetIter = 0;
-        for (BluetoothService service in widget.services) {
-          int iter = 0;
-          for(BluetoothCharacteristic c in service.characteristics) {
-            List<int> value = await c.read();
-            readResponse["Sneed${iter++}-$widgetIter"] = value as dynamic;
-          }
-          widgetIter++;
-        }
+        List<int> btData = await widget.characteristic.read();
+        readResponse["Sneed"] = btData as dynamic;
         jsonResponse = const JsonEncoder().convert(readResponse);
         lastTimeRead = DateTime.now();
       });
@@ -326,7 +290,39 @@ class JSONScreenState extends State<JSONScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Text('${(jsonResponse == "" ? "<No response from device yet>" : jsonResponse)} ${lastTimeRead.toString()}'),
-  );
+
+  Widget build(BuildContext context) {
+    List<ButtonTheme> buttons = [];
+    if (widget.characteristic.properties.read) {
+      buttons.add(
+        ButtonTheme(
+          minWidth: 10,
+          height: 20,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: RaisedButton(
+              color: Colors.blue,
+              child: const Text('READ', style: TextStyle(color: Colors.white)),
+              onPressed: () async {
+                var sub = widget.characteristic.value.listen((value) {
+                  setState(() {
+                    widget.readValues[widget.characteristic.uuid] = value;
+                  });
+                });
+                List<int> btData = await widget.characteristic.read();
+                sub.cancel();
+              },
+            ),
+          ),
+        ),
+      );
+    }
+    return Row(
+    children: <Widget>[
+      ...buttons,
+      Text('${(jsonResponse == "" ? "<No response from device yet>" : jsonResponse)} ${lastTimeRead.toString()}'),
+    ],
+    );
+  }
 }
+
