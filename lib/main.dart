@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
@@ -252,6 +253,10 @@ class _MyHomePageState extends State<MyHomePage> {
   );
 }
 
+void printInfo(String text) {
+  print('\x1B[33m$text\x1B[0m');
+}
+
 class JSONScreen extends StatefulWidget {
   final BluetoothDevice device;
   final BluetoothCharacteristic characteristic;
@@ -265,7 +270,7 @@ class JSONScreen extends StatefulWidget {
 }
 
 class JSONScreenState extends State<JSONScreen> {
-  late Timer readTimer;
+  Timer? readTimer;
   String jsonResponse = "";
   // The last time the bluetooth device was read from.
   DateTime lastTimeRead = DateTime.now();
@@ -276,17 +281,23 @@ class JSONScreenState extends State<JSONScreen> {
     final Map<String, dynamic> readResponse = {};
     return Timer.periodic(d, (Timer t) {
       setState(() async {
+        printInfo("Sneed, we are reading!!!!!!!!!");
+        var sub = widget.characteristic.value.listen((value) {
+          setState(() {
+            widget.readValues[widget.characteristic.uuid] = value;
+          });
+        });
         List<int> btData = await widget.characteristic.read();
         readResponse["Sneed"] = btData as dynamic;
         jsonResponse = const JsonEncoder().convert(readResponse);
         lastTimeRead = DateTime.now();
+        sub.cancel();
       });
     });
   }
 
   @override
   void initState() {
-    readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
   }
 
   @override
@@ -304,25 +315,43 @@ class JSONScreenState extends State<JSONScreen> {
               color: Colors.blue,
               child: const Text('READ', style: TextStyle(color: Colors.white)),
               onPressed: () async {
-                var sub = widget.characteristic.value.listen((value) {
-                  setState(() {
-                    widget.readValues[widget.characteristic.uuid] = value;
-                  });
-                });
-                List<int> btData = await widget.characteristic.read();
-                sub.cancel();
+                readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
               },
             ),
           ),
         ),
       );
     }
-    return Row(
-    children: <Widget>[
-      ...buttons,
-      Text('${(jsonResponse == "" ? "<No response from device yet>" : jsonResponse)} ${lastTimeRead.toString()}'),
-    ],
-    );
+    return Column (
+     children: [
+       Column (
+       children: <Widget>[
+       ...buttons,
+        RaisedButton(
+        onPressed: () {
+          timeIntervalMs += 1000;
+          if(readTimer != null) {
+            readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
+          }
+        },
+        child: const Icon(Icons.exposure_plus_1),
+      ),
+      RaisedButton(
+        onPressed: () {
+          timeIntervalMs = max(1000, timeIntervalMs - 1000);
+          if(readTimer != null) {
+            readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
+          }
+        },
+        child: const Icon(Icons.exposure_neg_1),
+      )],
+    ),
+    Column(
+       children: <Widget>[
+         Text('${(jsonResponse == "" ? "<No response from device yet>" : jsonResponse)} ${lastTimeRead.toString()}'),
+     ]
+    )
+    ]);
   }
 }
 
