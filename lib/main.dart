@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:neat_periodic_task/neat_periodic_task.dart';
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
@@ -107,11 +109,12 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
 
-    return ListView(
+    return ListView.builder(
       padding: const EdgeInsets.all(8),
-      children: <Widget>[
-        ...containers,
-      ],
+      itemCount: containers.length,
+      itemBuilder: (BuildContext context, int index) {
+        return containers[index];
+      },
     );
   }
 
@@ -229,15 +232,17 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
 
-    return ListView(
+    return ListView.builder(
       padding: const EdgeInsets.all(8),
-      children: <Widget>[
-        ...containers,
-      ],
+      itemCount: containers.length,
+      itemBuilder: (BuildContext context, int index) {
+        return containers[index];
+      },
     );
   }
 
   ListView _buildView() {
+
     if (_connectedDevice != null) {
       return _buildConnectDeviceView();
     }
@@ -249,7 +254,16 @@ class _MyHomePageState extends State<MyHomePage> {
     appBar: AppBar(
       title: Text(widget.title),
     ),
-    body: _buildView(),
+    body: Row(
+      children: [
+        Expanded(
+            child: SizedBox(
+                  height: 1200.0,
+                  child: _buildView()
+            ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -270,30 +284,37 @@ class JSONScreen extends StatefulWidget {
 }
 
 class JSONScreenState extends State<JSONScreen> {
-  Timer? readTimer;
+  NeatPeriodicTaskScheduler? readTimer;
   String jsonResponse = "";
   // The last time the bluetooth device was read from.
   DateTime lastTimeRead = DateTime.now();
   // Time interval between reads (milliseconds).
   int timeIntervalMs = 1000;
+  bool isReading = false;
 
-  Timer createReadTimer(Duration d) {
+  NeatPeriodicTaskScheduler createReadTimer(Duration d) {
     final Map<String, dynamic> readResponse = {};
-    return Timer.periodic(d, (Timer t) {
-      setState(() async {
-        printInfo("Sneed, we are reading!!!!!!!!!");
-        var sub = widget.characteristic.value.listen((value) {
-          setState(() {
-            widget.readValues[widget.characteristic.uuid] = value;
+
+    return NeatPeriodicTaskScheduler(
+      task: () async {
+          printInfo("I am reading.");
+          List<int> rValue = [];
+          var sub = widget.characteristic.value.listen((value) {
+            rValue = value;
           });
-        });
-        List<int> btData = await widget.characteristic.read();
-        readResponse["Sneed"] = btData as dynamic;
-        jsonResponse = const JsonEncoder().convert(readResponse);
-        lastTimeRead = DateTime.now();
-        sub.cancel();
-      });
-    });
+          List<int> btData = await widget.characteristic.read();
+          setState(() {
+            widget.readValues[widget.characteristic.uuid] = rValue;
+            readResponse["Sneed"] = btData as dynamic;
+            jsonResponse = const JsonEncoder().convert(readResponse);
+            lastTimeRead = DateTime.now();
+          });
+          sub.cancel();
+        },
+      interval: const Duration(seconds: 5),
+      minCycle: d, name: 'bt-reader',
+      timeout: const Duration(seconds: 5),
+    );
   }
 
   @override
@@ -316,13 +337,16 @@ class JSONScreenState extends State<JSONScreen> {
               child: const Text('READ', style: TextStyle(color: Colors.white)),
               onPressed: () async {
                 readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
+                readTimer?.start();
               },
             ),
           ),
         ),
       );
     }
-    return Column (
+    return Container(
+    child:
+      Row(
      children: [
        Column (
        children: <Widget>[
@@ -344,14 +368,18 @@ class JSONScreenState extends State<JSONScreen> {
           }
         },
         child: const Icon(Icons.exposure_neg_1),
-      )],
+      ),
+         Text(lastTimeRead.toString())
+       ],
     ),
     Column(
        children: <Widget>[
-         Text('${(jsonResponse == "" ? "<No response from device yet>" : jsonResponse)} ${lastTimeRead.toString()}'),
+         Text((jsonResponse == "" ? "<No response from device yet>" : jsonResponse),
+         maxLines: 100),
+         // Timestamp.
      ]
-    )
-    ]);
+    ),
+     ]));
   }
 }
 
