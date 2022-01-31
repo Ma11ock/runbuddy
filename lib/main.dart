@@ -294,9 +294,26 @@ class JSONScreenState extends State<JSONScreen> {
   Map<String, dynamic> readResponse = {};
 
   Widget jsonResponseTree() {
+    // Check if the bt module is trying to change the delta time.
+    if(readResponse.containsKey("deltaTime")) {
+      int newTimeMS = readResponse["deltaTime"] as int;
+      // Reset the map. Has to be done before createReadTimer because that calls
+      // setState().
+      readResponse.remove("deltaTime");
+      printInfo("Changing timer from $timeIntervalMs to ${timeIntervalMs += newTimeMS}");
+      if(timeIntervalMs > 0)  {
+        readTimer = createReadTimer();
+      } else {
+        readTimer!.stop();
+        readTimer = null;
+        printInfo("Stopping timer.");
+      }
+      return Text("Setting time by: $newTimeMS");
+    }
+
     if(
     //readResponse.containsKey("battery") &&
-       readResponse.containsKey("time")) {
+    readResponse.containsKey("time")) {
       // Runbuddy JSON.
       // String json.
       String jsonString = const JsonEncoder().convert(readResponse);
@@ -322,9 +339,14 @@ class JSONScreenState extends State<JSONScreen> {
   }
 
   NeatPeriodicTaskScheduler createReadTimer() {
+    if(readTimer != null) {
 
-    return NeatPeriodicTaskScheduler(
-      task: () async {
+      readTimer!.stop();
+      readTimer = null;
+    }
+      printInfo("Creating a new timer with duration $timeIntervalMs");
+      NeatPeriodicTaskScheduler newTimer = NeatPeriodicTaskScheduler(
+        task: () async {
           printInfo("I am reading.");
           List<int> rValue = [];
           var sub = widget.characteristic.value.listen((value) {
@@ -332,26 +354,42 @@ class JSONScreenState extends State<JSONScreen> {
           });
           List<int> rawBtData = await widget.characteristic.read();
           String btData = String.fromCharCodes(rawBtData);
+          // Set state function.
           setState(() {
             widget.readValues[widget.characteristic.uuid] = rValue;
-            // Try to treat result as JSON. If we cannot, just output raw result.
             printInfo("The BT data is $btData and the raw data is ${rawBtData.toString()}");
             //try {
-              // Would be used in an actual app.
-              //readResponse = const JsonDecoder().convert(btData);
-            readResponse["time"] = {"stamp" : btData};
+            // Would be used in an actual app.
+            //readResponse = const JsonDecoder().convert(btData);
+            // Check for change in time interval.
+            if(btData.isNotEmpty) {
+              if(btData[0] == '+' || btData[0] == '-') {
+                try {
+                  readResponse["deltaTime"] = int.parse(btData);
+                } catch (e) {
+                  printInfo("Could not convert $btData into an integer: ${e.toString()}");
+                }
+              }
+              else {
+                readResponse["time"] = {"stamp" : btData};
+              }
+            }
+
             //} on FormatException catch (_, e){
-           //   readResponse["String"] = btData as dynamic;
+            //   readResponse["String"] = btData as dynamic;
             //}
             lastTimeRead = DateTime.now();
           });
           sub.cancel();
         },
-      interval: Duration(milliseconds: timeIntervalMs),
-      minCycle: Duration(milliseconds: timeIntervalMs ~/ 2 - 1),
-      name: 'bt-reader',
-      timeout: Duration(milliseconds: timeIntervalMs * 2),
-    );
+        interval: Duration(milliseconds: timeIntervalMs),
+        minCycle: Duration(milliseconds: timeIntervalMs ~/ 2 - 1),
+        name: 'bt-reader',
+        timeout: Duration(milliseconds: timeIntervalMs * 2),
+      );
+
+      newTimer.start();
+      return newTimer;
   }
 
   @override
@@ -385,21 +423,17 @@ class JSONScreenState extends State<JSONScreen> {
        ...buttons,
         RaisedButton(
         onPressed: () {
+          printInfo("Increasing the timer by 1000ms.");
           timeIntervalMs += 1000;
-          if(readTimer != null) {
-            readTimer?.stop();
-            readTimer = createReadTimer();
-          }
+          readTimer = createReadTimer();
         },
         child: const Icon(Icons.exposure_plus_1),
       ),
       RaisedButton(
         onPressed: () {
+          printInfo("Decrementing the timer by 1000ms.");
           timeIntervalMs = max(1000, timeIntervalMs - 1000);
-          if(readTimer != null) {
-            readTimer?.stop();
-            readTimer = createReadTimer();
-          }
+          readTimer = createReadTimer();
         },
         child: const Icon(Icons.exposure_neg_1),
       ),
