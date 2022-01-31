@@ -285,15 +285,42 @@ class JSONScreen extends StatefulWidget {
 
 class JSONScreenState extends State<JSONScreen> {
   NeatPeriodicTaskScheduler? readTimer;
-  String jsonResponse = "";
   // The last time the bluetooth device was read from.
   DateTime lastTimeRead = DateTime.now();
   // Time interval between reads (milliseconds).
   int timeIntervalMs = 1000;
   bool isReading = false;
+  Map<String, dynamic> readResponse = {};
+
+  Widget jsonResponseTree() {
+    if(
+    //readResponse.containsKey("battery") &&
+       readResponse.containsKey("time")) {
+      // Runbuddy JSON.
+      // String json.
+      String jsonString = const JsonEncoder().convert(readResponse);
+      return Column(
+        children: [
+     //     Text(readResponse["battery"]["percent"]),
+          Text('{\n\t${readResponse["time"].toString()}\n}'),
+        ],
+      );
+    }
+
+    if(readResponse.isEmpty) {
+      return const Text("No response yet.");
+    }
+    // "String" is a generic key not found in the runbuddy normal result.
+    // For valid results that are not runbuddy JSON.
+    else if(!readResponse.containsKey("String")) {
+      readResponse["String"] = "Unknown response";
+    }
+
+    String jsonResponse = const JsonEncoder().convert(readResponse);
+    return Text(jsonResponse);
+  }
 
   NeatPeriodicTaskScheduler createReadTimer(Duration d) {
-    final Map<String, dynamic> readResponse = {};
 
     return NeatPeriodicTaskScheduler(
       task: () async {
@@ -302,11 +329,19 @@ class JSONScreenState extends State<JSONScreen> {
           var sub = widget.characteristic.value.listen((value) {
             rValue = value;
           });
-          List<int> btData = await widget.characteristic.read();
+          List<int> rawBtData = await widget.characteristic.read();
+          String btData = String.fromCharCodes(rawBtData);
           setState(() {
             widget.readValues[widget.characteristic.uuid] = rValue;
-            readResponse["Sneed"] = btData as dynamic;
-            jsonResponse = const JsonEncoder().convert(readResponse);
+            // Try to treat result as JSON. If we cannot, just output raw result.
+            printInfo("The BT data is $btData and the raw data is ${rawBtData.toString()}");
+            //try {
+              // Would be used in an actual app.
+              //readResponse = const JsonDecoder().convert(btData);
+            readResponse["time"] = {"stamp" : btData};
+            //} on FormatException catch (_, e){
+           //   readResponse["String"] = btData as dynamic;
+            //}
             lastTimeRead = DateTime.now();
           });
           sub.cancel();
@@ -318,11 +353,6 @@ class JSONScreenState extends State<JSONScreen> {
   }
 
   @override
-  void initState() {
-  }
-
-  @override
-
   Widget build(BuildContext context) {
     List<ButtonTheme> buttons = [];
     if (widget.characteristic.properties.read) {
@@ -355,6 +385,7 @@ class JSONScreenState extends State<JSONScreen> {
         onPressed: () {
           timeIntervalMs += 1000;
           if(readTimer != null) {
+            readTimer?.stop();
             readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
           }
         },
@@ -364,21 +395,16 @@ class JSONScreenState extends State<JSONScreen> {
         onPressed: () {
           timeIntervalMs = max(1000, timeIntervalMs - 1000);
           if(readTimer != null) {
+            readTimer?.stop();
             readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
           }
         },
         child: const Icon(Icons.exposure_neg_1),
       ),
-         Text(lastTimeRead.toString())
+         Text('${lastTimeRead.hour.toString()}:${lastTimeRead.minute.toString()}:${lastTimeRead.second.toString()}'),
        ],
     ),
-    Column(
-       children: <Widget>[
-         Text((jsonResponse == "" ? "<No response from device yet>" : jsonResponse),
-         maxLines: 100),
-         // Timestamp.
-     ]
-    ),
+       jsonResponseTree(),
      ]));
   }
 }
