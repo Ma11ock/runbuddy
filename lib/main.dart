@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
@@ -291,15 +292,20 @@ class JSONScreenState extends State<JSONScreen> {
   // Time interval between reads (milliseconds).
   int timeIntervalMs = 1000;
   bool isReading = false;
-  Map<String, dynamic> readResponse = {};
+  final Queue<Map<String, dynamic>> messageQueue = Queue();
+  bool testDoNotMakeTree = false;
 
   Widget jsonResponseTree() {
+    if(testDoNotMakeTree) {
+      return const Text("Nothing for now...");
+    }
+    Map<String, dynamic> readResponse = {};
+    if(messageQueue.isNotEmpty) {
+      readResponse = messageQueue.removeFirst();
+    }
     // Check if the bt module is trying to change the delta time.
     if(readResponse.containsKey("deltaTime")) {
       int newTimeMS = readResponse["deltaTime"] as int;
-      // Reset the map. Has to be done before createReadTimer because that calls
-      // setState().
-      readResponse.remove("deltaTime");
       printInfo("Changing timer from $timeIntervalMs to ${timeIntervalMs += newTimeMS}");
       if(timeIntervalMs > 0)  {
         readTimer = createReadTimer();
@@ -356,6 +362,7 @@ class JSONScreenState extends State<JSONScreen> {
           String btData = String.fromCharCodes(rawBtData);
           // Set state function.
           setState(() {
+            Map<String, dynamic> readResponse = {};
             widget.readValues[widget.characteristic.uuid] = rValue;
             printInfo("The BT data is $btData and the raw data is ${rawBtData.toString()}");
             //try {
@@ -374,7 +381,7 @@ class JSONScreenState extends State<JSONScreen> {
                 readResponse["time"] = {"stamp" : btData};
               }
             }
-
+            messageQueue.add(readResponse);
             //} on FormatException catch (_, e){
             //   readResponse["String"] = btData as dynamic;
             //}
@@ -440,6 +447,13 @@ class JSONScreenState extends State<JSONScreen> {
         },
         child: const Icon(Icons.exposure_neg_1),
       ),
+         RaisedButton(
+           onPressed: () {
+             testDoNotMakeTree = !testDoNotMakeTree;
+             printInfo("Toggling rendering the next message");
+           },
+           child: const Icon(Icons.exposure_neg_1),
+         ),
          Text('${lastTimeRead.hour.toString()}:${lastTimeRead.minute.toString()}:${lastTimeRead.second.toString()}'),
        ],
     ),
