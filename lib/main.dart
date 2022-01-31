@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/cupertino.dart';
 import 'package:neat_periodic_task/neat_periodic_task.dart';
 
 
@@ -320,7 +321,7 @@ class JSONScreenState extends State<JSONScreen> {
     return Text(jsonResponse);
   }
 
-  NeatPeriodicTaskScheduler createReadTimer(Duration d) {
+  NeatPeriodicTaskScheduler createReadTimer() {
 
     return NeatPeriodicTaskScheduler(
       task: () async {
@@ -346,9 +347,10 @@ class JSONScreenState extends State<JSONScreen> {
           });
           sub.cancel();
         },
-      interval: const Duration(seconds: 5),
-      minCycle: d, name: 'bt-reader',
-      timeout: const Duration(seconds: 5),
+      interval: Duration(milliseconds: timeIntervalMs),
+      minCycle: Duration(milliseconds: timeIntervalMs ~/ 2 - 1),
+      name: 'bt-reader',
+      timeout: Duration(milliseconds: timeIntervalMs * 2),
     );
   }
 
@@ -366,7 +368,7 @@ class JSONScreenState extends State<JSONScreen> {
               color: Colors.blue,
               child: const Text('READ', style: TextStyle(color: Colors.white)),
               onPressed: () async {
-                readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
+                readTimer = createReadTimer();
                 readTimer?.start();
               },
             ),
@@ -386,7 +388,7 @@ class JSONScreenState extends State<JSONScreen> {
           timeIntervalMs += 1000;
           if(readTimer != null) {
             readTimer?.stop();
-            readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
+            readTimer = createReadTimer();
           }
         },
         child: const Icon(Icons.exposure_plus_1),
@@ -396,7 +398,7 @@ class JSONScreenState extends State<JSONScreen> {
           timeIntervalMs = max(1000, timeIntervalMs - 1000);
           if(readTimer != null) {
             readTimer?.stop();
-            readTimer = createReadTimer(Duration(milliseconds: timeIntervalMs));
+            readTimer = createReadTimer();
           }
         },
         child: const Icon(Icons.exposure_neg_1),
