@@ -388,7 +388,10 @@ class JSONScreenState extends State<JSONScreen> {
         timeout: Duration(milliseconds: timeIntervalMs * 2),
       );
 
-      newTimer.start();
+      // Wait until some time has passed to start reading.
+      Timer(Duration(milliseconds: timeIntervalMs), () {
+        newTimer.start();
+      });
       return newTimer;
   }
 
