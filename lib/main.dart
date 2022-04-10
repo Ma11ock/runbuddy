@@ -369,18 +369,8 @@ class JSONScreenState extends State<JSONScreen> {
             // Would be used in an actual app.
             //readResponse = const JsonDecoder().convert(btData);
             // Check for change in time interval.
-            if(btData.isNotEmpty) {
-              if(btData[0] == '+' || btData[0] == '-') {
-                try {
-                  readResponse["deltaTime"] = int.parse(btData);
-                } catch (e) {
-                  printInfo("Could not convert $btData into an integer: ${e.toString()}");
-                }
-              }
-              else {
-                readResponse["time"] = {"stamp" : btData};
-              }
-            }
+            readResponse["time"] = {"stamp" : btData};
+
             messageQueue.add(readResponse);
             //} on FormatException catch (_, e){
             //   readResponse["String"] = btData as dynamic;
@@ -452,7 +442,7 @@ class JSONScreenState extends State<JSONScreen> {
                   testDoNotMakeTree = !testDoNotMakeTree;
                   printInfo("Toggling rendering the next message");
                 },
-                child: const Icon(Icons.exposure_neg_1),
+                child: const Icon(Icons.stop_circle_outlined),
               ),
               Text('${lastTimeRead.hour.toString()}:${lastTimeRead.minute.toString()}:${lastTimeRead.second.toString()}'),
             ],
