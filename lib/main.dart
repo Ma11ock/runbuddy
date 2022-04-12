@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
 import './blue.dart';
+import './widgets.dart';
 
 void main() => runApp(const Runbuddy());
 
@@ -18,8 +19,9 @@ class Runbuddy extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    title: 'Runbuddy',
     routes: <String, WidgetBuilder> {
-      '/': (BuildContext context) => MainHomePage(),
+      '/': (BuildContext context) => const MainHomePage(),
       '/blue': (BuildContext context) => BlueHomePage(title: 'Flutter BLE Demo')
     },
     theme: ThemeData(
@@ -29,7 +31,7 @@ class Runbuddy extends StatelessWidget {
 }
 
 class MainHomePage extends StatefulWidget {
-  MainHomePage({Key? key}) : super(key: key);
+  const MainHomePage({Key? key}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => MainHomePageState();

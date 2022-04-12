@@ -39,6 +39,7 @@ android {
         targetSdkVersion 19
         applicationId "com.runbuddy.run_buddy_blue"
         versionCode flutterVersionCode.toInteger()
+        multiDexEnabled true
         versionName flutterVersionName
     }
 
@@ -49,6 +50,10 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+}
+
+dependencies {
+    implementation 'androidx.multidex:multidex:2.0.1'
 }
 
 flutter {

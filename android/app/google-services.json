@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "36688609333",
+    "project_id": "runbuddy-8c507",
+    "storage_bucket": "runbuddy-8c507.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:36688609333:android:947a0a33fb71a9317b317c",
+        "android_client_info": {
+          "package_name": "com.runbuddy.run_buddy_blue"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "36688609333-6bknc84t9u1uhrsf21rrldktvd4764h6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzTsAdkiB01Lys2tvLhmND2nOiWv5cjpE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "36688609333-6bknc84t9u1uhrsf21rrldktvd4764h6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
