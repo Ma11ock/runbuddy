@@ -285,14 +285,15 @@ class JSONScreen extends StatefulWidget {
 }
 
 class JSONScreenState extends State<JSONScreen> {
-  NeatPeriodicTaskScheduler? readTimer;
+  static int btCounters = 0;
+  static NeatPeriodicTaskScheduler? readTimer;
   // The last time the bluetooth device was read from.
-  DateTime lastTimeRead = DateTime.now();
+  static DateTime lastTimeRead = DateTime.now();
   // Time interval between reads (milliseconds).
-  int timeIntervalMs = 1000;
-  bool isReading = false;
-  final Queue<Map<String, dynamic>> messageQueue = Queue();
-  bool testDoNotMakeTree = false;
+  static int timeIntervalMs = 1000;
+  static bool isReading = false;
+  static final Queue<Map<String, dynamic>> messageQueue = Queue();
+  static bool testDoNotMakeTree = false;
 
   Widget jsonResponseTree() {
     if(testDoNotMakeTree) {
@@ -345,14 +346,15 @@ class JSONScreenState extends State<JSONScreen> {
 
   NeatPeriodicTaskScheduler createReadTimer() {
     if(readTimer != null) {
-
-      readTimer!.stop();
+      printInfo("Stopping the current read timer");
+      readTimer!.stop().then((v) {
+      });
       readTimer = null;
     }
     printInfo("Creating a new timer with duration $timeIntervalMs");
     NeatPeriodicTaskScheduler newTimer = NeatPeriodicTaskScheduler(
       task: () async {
-        printInfo("I am reading.");
+        printInfo("Performing a read...");
         List<int> rValue = [];
         var sub = widget.characteristic.value.listen((value) {
           rValue = value;
@@ -380,7 +382,7 @@ class JSONScreenState extends State<JSONScreen> {
       },
       interval: Duration(milliseconds: timeIntervalMs),
       minCycle: Duration(milliseconds: timeIntervalMs ~/ 2 - 1),
-      name: 'bt-reader',
+      name: 'bt-reader${btCounters++}',
       timeout: Duration(milliseconds: timeIntervalMs * 2),
     );
 
@@ -406,7 +408,6 @@ class JSONScreenState extends State<JSONScreen> {
               child: const Text('READ', style: TextStyle(color: Colors.white)),
               onPressed: () async {
                 readTimer = createReadTimer();
-                readTimer?.start();
               },
             ),
           ),
