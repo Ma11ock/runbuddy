@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';           // new
 import 'firebase_options.dart';                    // new
 import 'authentication.dart';                  // new
 import 'widgets.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';  // new
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
@@ -54,6 +55,7 @@ class MainHomePage extends StatefulWidget {
 class MainHomePageState extends State<MainHomePage> {
   @override
   Widget build(BuildContext context) => Scaffold(
+    floatingActionButton: BlueButton(),
     appBar: AppBar(title: const Text('Main App')),
     body: Column(
         children: [
@@ -84,6 +86,23 @@ class MainHomePageState extends State<MainHomePage> {
 class ApplicationState extends ChangeNotifier {
   ApplicationState() {
     init();
+  }
+
+  // Add from here
+  Future<DocumentReference> addMessageToGuestBook(List<double> data, Duration avgStep) {
+    if (_loginState != ApplicationLoginState.loggedIn) {
+      throw Exception('Must be logged in');
+    }
+
+    return FirebaseFirestore.instance
+        .collection('run-data')
+        .add(<String, dynamic>{
+      'data': data,
+      'stepMS' : avgStep.inMilliseconds,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+      'name': FirebaseAuth.instance.currentUser!.displayName,
+      'userId': FirebaseAuth.instance.currentUser!.uid,
+    });
   }
 
   Future<void> init() async {
