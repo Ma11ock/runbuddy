@@ -15,7 +15,7 @@ class BlueButton extends FloatingActionButton {
   });
 
   static void createReadTimer(BluetoothCharacteristic char,
-                              int timeIntervalMs) {
+    int timeIntervalMs) {
     if(readTimer != null) {
       printInfo("Stopping the current read timer");
       readTimer!.stop().then((v) {
@@ -28,7 +28,7 @@ class BlueButton extends FloatingActionButton {
         printInfo("Performing a read...");
         List<int> rValue = [];
         var sub = char.value.listen((value) {
-          rValue = value;
+            rValue = value;
         });
         List<int> rawBtData = await char.read();
         String btData = String.fromCharCodes(rawBtData);
@@ -57,7 +57,7 @@ class BlueButton extends FloatingActionButton {
 
     // Wait until some time has passed to start reading.
     Timer(Duration(milliseconds: timeIntervalMs), () {
-      readTimer?.start();
+        readTimer?.start();
     });
 
     characteristic = char;
@@ -125,7 +125,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
   void _addDeviceTolist(final BluetoothDevice device) {
     if (!widget.devicesList.contains(device)) {
       setState(() {
-        widget.devicesList.add(device);
+          widget.devicesList.add(device);
       });
     }
   }
@@ -134,16 +134,16 @@ class _BlueHomePageState extends State<BlueHomePage> {
   void initState() {
     super.initState();
     BlueButton.flutterBlue.connectedDevices
-        .asStream()
-        .listen((List<BluetoothDevice> devices) {
-      for (BluetoothDevice device in devices) {
-        _addDeviceTolist(device);
-      }
+    .asStream()
+    .listen((List<BluetoothDevice> devices) {
+        for (BluetoothDevice device in devices) {
+          _addDeviceTolist(device);
+        }
     });
     BlueButton.flutterBlue.scanResults.listen((List<ScanResult> results) {
-      for (ScanResult result in results) {
-        _addDeviceTolist(result.device);
-      }
+        for (ScanResult result in results) {
+          _addDeviceTolist(result.device);
+        }
     });
     BlueButton.flutterBlue.startScan();
   }
@@ -182,7 +182,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
                     _services = await device.discoverServices();
                   }
                   setState(() {
-                    _connectedDevice = device;
+                      _connectedDevice = device;
                   });
                 },
               ),
@@ -202,7 +202,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
   }
 
   List<ButtonTheme> _buildReadWriteNotifyButton(
-      BluetoothCharacteristic characteristic) {
+    BluetoothCharacteristic characteristic) {
     List<ButtonTheme> buttons = <ButtonTheme>[];
     if (characteristic.properties.write) {
       buttons.add(
@@ -215,37 +215,37 @@ class _BlueHomePageState extends State<BlueHomePage> {
               child: const Text('WRITE', style: const TextStyle(color: Colors.white)),
               onPressed: () async {
                 await showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: const Text("Write"),
-                        content: Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: TextField(
-                                controller: _writeController,
-                              ),
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text("Write"),
+                      content: Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: TextField(
+                              controller: _writeController,
                             ),
-                          ],
-                        ),
-                        actions: <Widget>[
-                          FlatButton(
-                            child: const Text("Send"),
-                            onPressed: () {
-                              characteristic.write(
-                                  utf8.encode(_writeController.value.text));
-                              Navigator.pop(context);
-                            },
-                          ),
-                          FlatButton(
-                            child: const Text("Cancel"),
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
                           ),
                         ],
-                      );
-                    });
+                      ),
+                      actions: <Widget>[
+                        FlatButton(
+                          child: const Text("Send"),
+                          onPressed: () {
+                            characteristic.write(
+                              utf8.encode(_writeController.value.text));
+                            Navigator.pop(context);
+                          },
+                        ),
+                        FlatButton(
+                          child: const Text("Cancel"),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    );
+                });
               },
             ),
           ),
@@ -263,7 +263,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
               child: const Text('NOTIFY', style: TextStyle(color: Colors.white)),
               onPressed: () async {
                 characteristic.value.listen((value) {
-                  widget.readValues[characteristic.uuid] = value;
+                    widget.readValues[characteristic.uuid] = value;
                 });
                 await characteristic.setNotifyValue(true);
               },
@@ -291,7 +291,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
                 Row(
                   children: <Widget>[
                     Text(characteristic.uuid.toString(),
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   ],
                 ),
                 Row(
@@ -309,8 +309,8 @@ class _BlueHomePageState extends State<BlueHomePage> {
       containers.add(
         Container(
           child: ExpansionTile(
-              title: Text(service.uuid.toString()),
-              children: characteristicsWidget),
+            title: Text(service.uuid.toString()),
+            children: characteristicsWidget),
         ),
       );
     }
@@ -341,8 +341,8 @@ class _BlueHomePageState extends State<BlueHomePage> {
       children: [
         Expanded(
           child: SizedBox(
-              height: 1200.0,
-              child: _buildView()
+            height: 1200.0,
+            child: _buildView()
           ),
         ),
       ],
@@ -359,8 +359,8 @@ class JSONScreen extends StatefulWidget {
   final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
   final BluetoothCharacteristic characteristic;
   JSONScreen({Key? key, required this.device,
-    required this.characteristic}) :
-        super(key: key);
+      required this.characteristic}) :
+  super(key: key);
 
   @override
   JSONScreenState createState() => JSONScreenState();
@@ -412,8 +412,8 @@ class JSONScreenState extends State<JSONScreen> {
     }
 
     if(
-    //readResponse.containsKey("battery") &&
-    readResponse.containsKey("time")) {
+      //readResponse.containsKey("battery") &&
+      readResponse.containsKey("time")) {
       // Runbuddy JSON.
       // String json.
       String jsonString = const JsonEncoder().convert(readResponse);
@@ -456,7 +456,7 @@ class JSONScreenState extends State<JSONScreen> {
                 shouldUpdate = true;
                 initTimer();
                 BlueButton.createReadTimer(widget.characteristic,
-                                           timeIntervalMs);
+                  timeIntervalMs);
               },
             ),
           ),
@@ -464,41 +464,41 @@ class JSONScreenState extends State<JSONScreen> {
       );
     }
     return Container(
-        child:
-        Row(
-            children: [
-              Column (
-                children: <Widget>[
-                  ...buttons,
-                  RaisedButton(
-                    onPressed: () {
-                      printInfo("Increasing the timer by 1000ms.");
-                      timeIntervalMs += 1000;
-                      BlueButton.createReadTimer(widget.characteristic,
-                          timeIntervalMs);
-                    },
-                    child: const Icon(Icons.exposure_plus_1),
-                  ),
-                  RaisedButton(
-                    onPressed: () {
-                      printInfo("Decrementing the timer by 1000ms.");
-                      timeIntervalMs = max(1000, timeIntervalMs - 1000);
-                      BlueButton.createReadTimer(widget.characteristic,
-                          timeIntervalMs);
-                    },
-                    child: const Icon(Icons.exposure_neg_1),
-                  ),
-                  RaisedButton(
-                    onPressed: () {
-                      shouldUpdate = !shouldUpdate;
-                      printInfo("Toggling rendering the next message");
-                    },
-                    child: const Icon(Icons.stop_circle_outlined),
-                  ),
-                  Text('${BlueButton.lastTimeRead.hour.toString()}:${BlueButton.lastTimeRead.minute.toString()}:${BlueButton.lastTimeRead.second.toString()}'),
-                ],
+      child:
+      Row(
+        children: [
+          Column (
+            children: <Widget>[
+              ...buttons,
+              RaisedButton(
+                onPressed: () {
+                  printInfo("Increasing the timer by 1000ms.");
+                  timeIntervalMs += 1000;
+                  BlueButton.createReadTimer(widget.characteristic,
+                    timeIntervalMs);
+                },
+                child: const Icon(Icons.exposure_plus_1),
               ),
-              jsonResponseTree(),
-            ]));
+              RaisedButton(
+                onPressed: () {
+                  printInfo("Decrementing the timer by 1000ms.");
+                  timeIntervalMs = max(1000, timeIntervalMs - 1000);
+                  BlueButton.createReadTimer(widget.characteristic,
+                    timeIntervalMs);
+                },
+                child: const Icon(Icons.exposure_neg_1),
+              ),
+              RaisedButton(
+                onPressed: () {
+                  shouldUpdate = !shouldUpdate;
+                  printInfo("Toggling rendering the next message");
+                },
+                child: const Icon(Icons.stop_circle_outlined),
+              ),
+              Text('${BlueButton.lastTimeRead.hour.toString()}:${BlueButton.lastTimeRead.minute.toString()}:${BlueButton.lastTimeRead.second.toString()}'),
+            ],
+          ),
+          jsonResponseTree(),
+    ]));
   }
 }

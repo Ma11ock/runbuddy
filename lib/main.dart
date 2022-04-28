@@ -58,26 +58,26 @@ class MainHomePageState extends State<MainHomePage> {
     floatingActionButton: BlueButton(),
     appBar: AppBar(title: const Text('Main App')),
     body: Column(
-        children: [
-          const Text('This is some test text'),
-          RaisedButton(
-            child: const Text('Go to Bluetooth'),
-            onPressed: () {
-              Navigator.pushNamed(context, '/blue');
-           }),
-          Consumer<ApplicationState>(
-            builder: (context, appState, _) => Authentication(
-              email: appState.email,
-              loginState: appState.loginState,
-              startLoginFlow: appState.startLoginFlow,
-              verifyEmail: appState.verifyEmail,
-              signInWithEmailAndPassword: appState.signInWithEmailAndPassword,
-              cancelRegistration: appState.cancelRegistration,
-              registerAccount: appState.registerAccount,
-              signOut: appState.signOut,
-            ),
+      children: [
+        const Text('This is some test text'),
+        RaisedButton(
+          child: const Text('Go to Bluetooth'),
+          onPressed: () {
+            Navigator.pushNamed(context, '/blue');
+        }),
+        Consumer<ApplicationState>(
+          builder: (context, appState, _) => Authentication(
+            email: appState.email,
+            loginState: appState.loginState,
+            startLoginFlow: appState.startLoginFlow,
+            verifyEmail: appState.verifyEmail,
+            signInWithEmailAndPassword: appState.signInWithEmailAndPassword,
+            cancelRegistration: appState.cancelRegistration,
+            registerAccount: appState.registerAccount,
+            signOut: appState.signOut,
           ),
-        ],
+        ),
+      ],
     ),
   );
 
@@ -95,13 +95,13 @@ class ApplicationState extends ChangeNotifier {
     }
 
     return FirebaseFirestore.instance
-        .collection('run-data')
-        .add(<String, dynamic>{
-      'data': data,
-      'stepMS' : avgStep.inMilliseconds,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-      'name': FirebaseAuth.instance.currentUser!.displayName,
-      'userId': FirebaseAuth.instance.currentUser!.uid,
+    .collection('run-data')
+    .add(<String, dynamic>{
+        'data': data,
+        'stepMS' : avgStep.inMilliseconds,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'name': FirebaseAuth.instance.currentUser!.displayName,
+        'userId': FirebaseAuth.instance.currentUser!.uid,
     });
   }
 
@@ -111,12 +111,12 @@ class ApplicationState extends ChangeNotifier {
     );
 
     FirebaseAuth.instance.userChanges().listen((user) {
-      if (user != null) {
-        _loginState = ApplicationLoginState.loggedIn;
-      } else {
-        _loginState = ApplicationLoginState.loggedOut;
-      }
-      notifyListeners();
+        if (user != null) {
+          _loginState = ApplicationLoginState.loggedIn;
+        } else {
+          _loginState = ApplicationLoginState.loggedOut;
+        }
+        notifyListeners();
     });
   }
 
@@ -132,9 +132,9 @@ class ApplicationState extends ChangeNotifier {
   }
 
   Future<void> verifyEmail(
-      String email,
-      void Function(FirebaseAuthException e) errorCallback,
-      ) async {
+    String email,
+    void Function(FirebaseAuthException e) errorCallback,
+  ) async {
     try {
       var methods =
       await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
@@ -151,10 +151,10 @@ class ApplicationState extends ChangeNotifier {
   }
 
   Future<void> signInWithEmailAndPassword(
-      String email,
-      String password,
-      void Function(FirebaseAuthException e) errorCallback,
-      ) async {
+    String email,
+    String password,
+    void Function(FirebaseAuthException e) errorCallback,
+  ) async {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
@@ -171,13 +171,13 @@ class ApplicationState extends ChangeNotifier {
   }
 
   Future<void> registerAccount(
-      String email,
-      String displayName,
-      String password,
-      void Function(FirebaseAuthException e) errorCallback) async {
+    String email,
+    String displayName,
+    String password,
+    void Function(FirebaseAuthException e) errorCallback) async {
     try {
       var credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(email: email, password: password);
+      .createUserWithEmailAndPassword(email: email, password: password);
       await credential.user!.updateDisplayName(displayName);
     } on FirebaseAuthException catch (e) {
       errorCallback(e);
