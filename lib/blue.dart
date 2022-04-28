@@ -10,6 +10,89 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
 
+class BlueButton extends FloatingActionButton {
+  BlueButton() : super(onPressed: () {
+  });
+
+  static void createReadTimer(BluetoothCharacteristic char,
+                              int timeIntervalMs) {
+    if(readTimer != null) {
+      printInfo("Stopping the current read timer");
+      readTimer!.stop().then((v) {
+      });
+      readTimer = null;
+    }
+    printInfo("Creating a new timer with duration $timeIntervalMs");
+    readTimer = NeatPeriodicTaskScheduler(
+      task: () async {
+        printInfo("Performing a read...");
+        List<int> rValue = [];
+        var sub = char.value.listen((value) {
+          rValue = value;
+        });
+        List<int> rawBtData = await char.read();
+        String btData = String.fromCharCodes(rawBtData);
+        // Set state function.
+        Map<String, dynamic> readResponse = {};
+        readValues[char.uuid] = rValue;
+        printInfo("The BT data is $btData and the raw data is ${rawBtData.toString()}");
+        //try {
+        // Would be used in an actual app.
+        //readResponse = const JsonDecoder().convert(btData);
+        // Check for change in time interval.
+        readResponse["time"] = {"stamp": btData};
+
+        messageQueue.add(readResponse);
+        //} on FormatException catch (_, e){
+        //   readResponse["String"] = btData as dynamic;
+        //}
+        lastTimeRead = DateTime.now();
+        sub.cancel();
+      },
+      interval: Duration(milliseconds: timeIntervalMs),
+      minCycle: Duration(milliseconds: timeIntervalMs ~/ 2 - 1),
+      name: 'bt-reader${btCounters++}',
+      timeout: Duration(milliseconds: timeIntervalMs * 2),
+    );
+
+    // Wait until some time has passed to start reading.
+    Timer(Duration(milliseconds: timeIntervalMs), () {
+      readTimer?.start();
+    });
+
+    characteristic = char;
+  }
+
+  static void setCharacteristic(BluetoothCharacteristic btc) {
+    characteristic = btc;
+  }
+
+  static void unsetCharacteristic() {
+    characteristic = null;
+  }
+
+  static void toggleRead() {
+    shouldRead != shouldRead;
+  }
+
+  static List<int>? getRValue() {
+    return readValues[characteristic!.uuid];
+  }
+
+  static bool shouldRead = false;
+  static BluetoothCharacteristic? characteristic;
+  static int btCounters = 0;
+  static NeatPeriodicTaskScheduler? readTimer;
+  // The last time the bluetooth device was read from.
+  static DateTime lastTimeRead = DateTime.now();
+  // Time interval between reads (milliseconds).
+  static bool isReading = false;
+  static final Queue<Map<String, dynamic>> messageQueue = Queue();
+  static bool testDoNotMakeTree = false;
+  static final FlutterBlue flutterBlue = FlutterBlue.instance;
+  static final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
+}
+
 class BlueWidget extends StatelessWidget {
   const BlueWidget({Key? key}) : super(key: key);
 
@@ -27,7 +110,6 @@ class BlueHomePage extends StatefulWidget {
   BlueHomePage({Key? key, required this.title}) : super(key: key);
 
   final String title;
-  final FlutterBlue flutterBlue = FlutterBlue.instance;
   final List<BluetoothDevice> devicesList = <BluetoothDevice>[];
   final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
 
@@ -51,19 +133,19 @@ class _BlueHomePageState extends State<BlueHomePage> {
   @override
   void initState() {
     super.initState();
-    widget.flutterBlue.connectedDevices
+    BlueButton.flutterBlue.connectedDevices
         .asStream()
         .listen((List<BluetoothDevice> devices) {
       for (BluetoothDevice device in devices) {
         _addDeviceTolist(device);
       }
     });
-    widget.flutterBlue.scanResults.listen((List<ScanResult> results) {
+    BlueButton.flutterBlue.scanResults.listen((List<ScanResult> results) {
       for (ScanResult result in results) {
         _addDeviceTolist(result.device);
       }
     });
-    widget.flutterBlue.startScan();
+    BlueButton.flutterBlue.startScan();
   }
 
   ListView _buildListViewOfDevices() {
@@ -89,7 +171,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
                   style: TextStyle(color: Colors.white),
                 ),
                 onPressed: () async {
-                  widget.flutterBlue.stopScan();
+                  BlueButton.flutterBlue.stopScan();
                   try {
                     await device.connect();
                   } catch (e) {
@@ -274,8 +356,8 @@ void printInfo(String text) {
 
 class JSONScreen extends StatefulWidget {
   final BluetoothDevice device;
-  final BluetoothCharacteristic characteristic;
   final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
+  final BluetoothCharacteristic characteristic;
   JSONScreen({Key? key, required this.device,
     required this.characteristic}) :
         super(key: key);
@@ -285,33 +367,45 @@ class JSONScreen extends StatefulWidget {
 }
 
 class JSONScreenState extends State<JSONScreen> {
-  static int btCounters = 0;
-  static NeatPeriodicTaskScheduler? readTimer;
-  // The last time the bluetooth device was read from.
-  static DateTime lastTimeRead = DateTime.now();
-  // Time interval between reads (milliseconds).
   static int timeIntervalMs = 1000;
-  static bool isReading = false;
-  static final Queue<Map<String, dynamic>> messageQueue = Queue();
-  static bool testDoNotMakeTree = false;
+  static bool shouldUpdate = false;
+
+  late NeatPeriodicTaskScheduler readTimer;
+
+  void initTimer() {
+    printInfo("Creating read timer");
+    readTimer = NeatPeriodicTaskScheduler(
+      task: () async {
+        printInfo("Setting the task");
+        if (shouldUpdate) {
+          setState(() {});
+        }
+      },
+      timeout: const Duration(seconds: 1 * 2),
+      minCycle: const Duration(milliseconds: 500),
+      interval: const Duration(milliseconds: 1001),
+      name: 'test-schedular',
+    );
+    readTimer.start();
+  }
 
   Widget jsonResponseTree() {
-    if(testDoNotMakeTree) {
+    if(!shouldUpdate) {
       return const Text("Nothing for now...");
     }
     Map<String, dynamic> readResponse = {};
-    if(messageQueue.isNotEmpty) {
-      readResponse = messageQueue.removeFirst();
+    if(BlueButton.messageQueue.isNotEmpty) {
+      readResponse = BlueButton.messageQueue.removeFirst();
     }
     // Check if the bt module is trying to change the delta time.
     if(readResponse.containsKey("deltaTime")) {
       int newTimeMS = readResponse["deltaTime"] as int;
-      printInfo("Changing timer from $timeIntervalMs to ${timeIntervalMs += newTimeMS}");
+      printInfo("Changing timer from $BlueButton.timeIntervalMs to ${timeIntervalMs += newTimeMS}");
       if(timeIntervalMs > 0)  {
-        readTimer = createReadTimer();
+        BlueButton.createReadTimer(widget.characteristic, timeIntervalMs);
       } else {
-        readTimer!.stop();
-        readTimer = null;
+        BlueButton.readTimer!.stop();
+        BlueButton.readTimer = null;
         printInfo("Stopping timer.");
       }
       return Text("Setting time by: $newTimeMS");
@@ -331,6 +425,7 @@ class JSONScreenState extends State<JSONScreen> {
       );
     }
 
+    printInfo("Response");
     if(readResponse.isEmpty) {
       return const Text("No response yet.");
     }
@@ -342,55 +437,6 @@ class JSONScreenState extends State<JSONScreen> {
 
     String jsonResponse = const JsonEncoder().convert(readResponse);
     return Text(jsonResponse);
-  }
-
-  NeatPeriodicTaskScheduler createReadTimer() {
-    if(readTimer != null) {
-      printInfo("Stopping the current read timer");
-      readTimer!.stop().then((v) {
-      });
-      readTimer = null;
-    }
-    printInfo("Creating a new timer with duration $timeIntervalMs");
-    NeatPeriodicTaskScheduler newTimer = NeatPeriodicTaskScheduler(
-      task: () async {
-        printInfo("Performing a read...");
-        List<int> rValue = [];
-        var sub = widget.characteristic.value.listen((value) {
-          rValue = value;
-        });
-        List<int> rawBtData = await widget.characteristic.read();
-        String btData = String.fromCharCodes(rawBtData);
-        // Set state function.
-        setState(() {
-          Map<String, dynamic> readResponse = {};
-          widget.readValues[widget.characteristic.uuid] = rValue;
-          printInfo("The BT data is $btData and the raw data is ${rawBtData.toString()}");
-          //try {
-          // Would be used in an actual app.
-          //readResponse = const JsonDecoder().convert(btData);
-          // Check for change in time interval.
-          readResponse["time"] = {"stamp" : btData};
-
-          messageQueue.add(readResponse);
-          //} on FormatException catch (_, e){
-          //   readResponse["String"] = btData as dynamic;
-          //}
-          lastTimeRead = DateTime.now();
-        });
-        sub.cancel();
-      },
-      interval: Duration(milliseconds: timeIntervalMs),
-      minCycle: Duration(milliseconds: timeIntervalMs ~/ 2 - 1),
-      name: 'bt-reader${btCounters++}',
-      timeout: Duration(milliseconds: timeIntervalMs * 2),
-    );
-
-    // Wait until some time has passed to start reading.
-    Timer(Duration(milliseconds: timeIntervalMs), () {
-      newTimer.start();
-    });
-    return newTimer;
   }
 
   @override
@@ -407,7 +453,10 @@ class JSONScreenState extends State<JSONScreen> {
               color: Colors.blue,
               child: const Text('READ', style: TextStyle(color: Colors.white)),
               onPressed: () async {
-                readTimer = createReadTimer();
+                shouldUpdate = true;
+                initTimer();
+                BlueButton.createReadTimer(widget.characteristic,
+                                           timeIntervalMs);
               },
             ),
           ),
@@ -425,7 +474,8 @@ class JSONScreenState extends State<JSONScreen> {
                     onPressed: () {
                       printInfo("Increasing the timer by 1000ms.");
                       timeIntervalMs += 1000;
-                      readTimer = createReadTimer();
+                      BlueButton.createReadTimer(widget.characteristic,
+                          timeIntervalMs);
                     },
                     child: const Icon(Icons.exposure_plus_1),
                   ),
@@ -433,22 +483,22 @@ class JSONScreenState extends State<JSONScreen> {
                     onPressed: () {
                       printInfo("Decrementing the timer by 1000ms.");
                       timeIntervalMs = max(1000, timeIntervalMs - 1000);
-                      readTimer = createReadTimer();
+                      BlueButton.createReadTimer(widget.characteristic,
+                          timeIntervalMs);
                     },
                     child: const Icon(Icons.exposure_neg_1),
                   ),
                   RaisedButton(
                     onPressed: () {
-                      testDoNotMakeTree = !testDoNotMakeTree;
+                      shouldUpdate = !shouldUpdate;
                       printInfo("Toggling rendering the next message");
                     },
                     child: const Icon(Icons.stop_circle_outlined),
                   ),
-                  Text('${lastTimeRead.hour.toString()}:${lastTimeRead.minute.toString()}:${lastTimeRead.second.toString()}'),
+                  Text('${BlueButton.lastTimeRead.hour.toString()}:${BlueButton.lastTimeRead.minute.toString()}:${BlueButton.lastTimeRead.second.toString()}'),
                 ],
               ),
               jsonResponseTree(),
             ]));
   }
 }
-
