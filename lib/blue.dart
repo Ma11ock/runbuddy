@@ -11,8 +11,22 @@ import 'package:flutter_blue/flutter_blue.dart';
 
 
 class BlueButton extends FloatingActionButton {
-  BlueButton() : super(onPressed: () {
-  });
+  BlueButton() : super(
+    onPressed: () {
+      if(readTimer != null) {
+        shouldRead = !shouldRead;
+        if(!shouldRead) {
+          printInfo("Stopping the read timer.");
+          readTimer!.stop();
+        } else {
+          printInfo("Starting the read timer.");
+          createReadTimer(characteristic!, timeIntervalMs);
+        }
+      } else {
+        printInfo("Warn: Bluetooth not set up.");
+      }
+    },
+    child: const Icon(Icons.bluetooth));
 
   static void createReadTimer(BluetoothCharacteristic char,
     int timeIntervalMs) {
@@ -61,6 +75,7 @@ class BlueButton extends FloatingActionButton {
     });
 
     characteristic = char;
+    BlueButton.timeIntervalMs = timeIntervalMs;
   }
 
   static void setCharacteristic(BluetoothCharacteristic btc) {
@@ -72,13 +87,14 @@ class BlueButton extends FloatingActionButton {
   }
 
   static void toggleRead() {
-    shouldRead != shouldRead;
+    shouldRead = !shouldRead;
   }
 
   static List<int>? getRValue() {
     return readValues[characteristic!.uuid];
   }
 
+  static int timeIntervalMs = 1000;
   static bool shouldRead = false;
   static BluetoothCharacteristic? characteristic;
   static int btCounters = 0;
@@ -377,6 +393,7 @@ class JSONScreenState extends State<JSONScreen> {
     readTimer = NeatPeriodicTaskScheduler(
       task: () async {
         printInfo("Setting the task");
+        // Reset the state, reads from BlueButton.
         if (shouldUpdate) {
           setState(() {});
         }
