@@ -87,6 +87,7 @@ class MainHomePageState extends State<MainHomePage> {
                 UserForm(
                   addMessage: (message) =>
                   appState.addMessageToUserForm(message),
+                  messages: appState.userMessages,
                 ),
               ],
             ],
@@ -115,8 +116,7 @@ class ApplicationState extends ChangeNotifier {
     init();
   }
 
-  // Add from here
-  Future<DocumentReference> addMessageToUserForm(String stride) {
+  Future<void> addMessageToUserForm(String stride) {
     if (_loginState != ApplicationLoginState.loggedIn) {
       throw Exception('Must be logged in');
     }
@@ -128,12 +128,17 @@ class ApplicationState extends ChangeNotifier {
 
     return FirebaseFirestore.instance
     .collection('run-data')
-    .add(<String, dynamic>{
-        'step' : iStep!,
+    .doc(FirebaseAuth.instance.currentUser!.email)
+    .set(<String, dynamic>{
+        'stepCM' : iStep,
+        'numSteps' : 0,
+        'distanceTraveledM' : 0,
+        'avgHeartRate' : 0,
+        'timestamp' : DateTime.now().millisecondsSinceEpoch,
         'email': FirebaseAuth.instance.currentUser!.email,
         'name': FirebaseAuth.instance.currentUser!.displayName,
         'userId': FirebaseAuth.instance.currentUser!.uid,
-    });
+    }).catchError((error) => throw Exception("Failed to add document: $error"));
   }
 
   Future<void> init() async {
@@ -146,8 +151,9 @@ class ApplicationState extends ChangeNotifier {
           _loginState = ApplicationLoginState.loggedIn;
           // Add from here
           _userMessageSubscription = FirebaseFirestore.instance
-          .collection('guestbook')
+          .collection('run-data')
           .orderBy('timestamp', descending: true)
+          .limit(1)
           .snapshots()
           .listen((snapshot) {
               _userMessages = [];
@@ -155,7 +161,7 @@ class ApplicationState extends ChangeNotifier {
                 _userMessages.add(
                   UserInfoMessage(
                     name: document.data()['name'] as String,
-                    message: document.data()['text'] as String,
+                    message: document.data()['email'] as String,
                   ),
                 );
               }
@@ -170,30 +176,25 @@ class ApplicationState extends ChangeNotifier {
     });
   }
 
-  ApplicationLoginState _loginState = ApplicationLoginState.loggedOut;
-  ApplicationLoginState get loginState => _loginState;
-
-  String? _email;
-  String? get email => _email;
-
   void startLoginFlow() {
     _loginState = ApplicationLoginState.emailAddress;
     notifyListeners();
   }
 
   Future<void> verifyEmail(
-    String email,
+    String theEmail,
     void Function(FirebaseAuthException e) errorCallback,
   ) async {
     try {
       var methods =
-      await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+      await FirebaseAuth.instance.fetchSignInMethodsForEmail(theEmail);
       if (methods.contains('password')) {
         _loginState = ApplicationLoginState.password;
       } else {
         _loginState = ApplicationLoginState.register;
       }
-      _email = email;
+      _email = theEmail;
+      printInfo("Email set!");
       notifyListeners();
     } on FirebaseAuthException catch (e) {
       errorCallback(e);
@@ -252,52 +253,61 @@ class _UserFormState extends State<UserForm> {
   final _controller = TextEditingController();
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Form(
-        key: _formKey,
-        child: Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _controller,
-                decoration: const InputDecoration(
-                  hintText: 'Please enter your walking stride.',
+  Widget build(BuildContext context) =>
+  Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Form(
+          key: _formKey,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _controller,
+                  decoration: const InputDecoration(
+                    hintText: 'Please enter your walking stride.',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Enter your stride';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Enter your stride';
+              ),
+              const SizedBox(width: 8),
+              StyledButton(
+                onPressed: () async {
+                  if (_formKey.currentState!.validate()) {
+                    await widget.addMessage(_controller.text);
+                    _controller.clear();
                   }
-                  return null;
                 },
+                child: Row(
+                  children: const [
+                    Icon(Icons.send),
+                    SizedBox(width: 4),
+                    Text('SEND'),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            StyledButton(
-              onPressed: () async {
-                if (_formKey.currentState!.validate()) {
-                  await widget.addMessage(_controller.text);
-                  _controller.clear();
-                }
-              },
-              child: Row(
-                children: const [
-                  Icon(Icons.send),
-                  SizedBox(width: 4),
-                  Text('SEND'),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
-  }
+      const SizedBox(height: 8),
+      for (var message in widget.messages)
+        Paragraph('${message.name}: ${message.message}'),
+      const SizedBox(height: 8),
+    ]
+  );
 }
 
 class UserInfoMessage {
   UserInfoMessage({required this.name, required this.message});
   final String name;
   final String message;
+  // TODO add other fields.
 }
