@@ -35,7 +35,7 @@ class Runbuddy extends StatelessWidget {
     title: 'Runbuddy',
     routes: <String, WidgetBuilder> {
       '/': (BuildContext context) => const MainHomePage(),
-      '/blue': (BuildContext context) => BlueHomePage(title: 'Flutter BLE Demo')
+      '/blue': (BuildContext context) => BlueHomePage(title: 'Bluetooth Devices')
     },
     theme: ThemeData(
       primarySwatch: Colors.blue,
@@ -77,6 +77,22 @@ class MainHomePageState extends State<MainHomePage> {
             signOut: appState.signOut,
           ),
         ),
+        // Modify from here
+        Consumer<ApplicationState>(
+          builder: (context, appState, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (appState.loginState == ApplicationLoginState.loggedIn) ...[
+                const Header('User Info'),
+                UserForm(
+                  addMessage: (message) =>
+                  appState.addMessageToUserForm(message),
+                ),
+              ],
+            ],
+          ),
+        ),
+        // To here.
       ],
     ),
   );
@@ -84,22 +100,37 @@ class MainHomePageState extends State<MainHomePage> {
 }
 
 class ApplicationState extends ChangeNotifier {
+  ApplicationLoginState _loginState = ApplicationLoginState.loggedOut;
+  ApplicationLoginState get loginState => _loginState;
+
+  String? _email;
+  String? get email => _email;
+
+  // Add from here
+  StreamSubscription<QuerySnapshot>? _userMessageSubscription;
+  List<UserInfoMessage> _userMessages = [];
+  List<UserInfoMessage> get userMessages => _userMessages;
+  // to here.
   ApplicationState() {
     init();
   }
 
   // Add from here
-  Future<DocumentReference> addMessageToGuestBook(List<double> data, Duration avgStep) {
+  Future<DocumentReference> addMessageToUserForm(String stride) {
     if (_loginState != ApplicationLoginState.loggedIn) {
       throw Exception('Must be logged in');
+    }
+
+    int? iStep = int.tryParse(stride);
+    if(iStep == null) {
+      throw Exception('Stride must be a number');
     }
 
     return FirebaseFirestore.instance
     .collection('run-data')
     .add(<String, dynamic>{
-        'data': data,
-        'stepMS' : avgStep.inMilliseconds,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'step' : iStep!,
+        'email': FirebaseAuth.instance.currentUser!.email,
         'name': FirebaseAuth.instance.currentUser!.displayName,
         'userId': FirebaseAuth.instance.currentUser!.uid,
     });
@@ -113,8 +144,27 @@ class ApplicationState extends ChangeNotifier {
     FirebaseAuth.instance.userChanges().listen((user) {
         if (user != null) {
           _loginState = ApplicationLoginState.loggedIn;
+          // Add from here
+          _userMessageSubscription = FirebaseFirestore.instance
+          .collection('guestbook')
+          .orderBy('timestamp', descending: true)
+          .snapshots()
+          .listen((snapshot) {
+              _userMessages = [];
+              for (final document in snapshot.docs) {
+                _userMessages.add(
+                  UserInfoMessage(
+                    name: document.data()['name'] as String,
+                    message: document.data()['text'] as String,
+                  ),
+                );
+              }
+              notifyListeners();
+          });
         } else {
           _loginState = ApplicationLoginState.loggedOut;
+          _userMessages = [];
+          _userMessageSubscription?.cancel();
         }
         notifyListeners();
     });
@@ -187,4 +237,67 @@ class ApplicationState extends ChangeNotifier {
   void signOut() {
     FirebaseAuth.instance.signOut();
   }
+}
+class UserForm extends StatefulWidget {
+  const UserForm({required this.addMessage, required this.messages});
+  final FutureOr<void> Function(String message) addMessage;
+  final List<UserInfoMessage> messages;
+
+  @override
+  _UserFormState createState() => _UserFormState();
+}
+
+class _UserFormState extends State<UserForm> {
+  final _formKey = GlobalKey<FormState>(debugLabel: '_UserFormState');
+  final _controller = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Form(
+        key: _formKey,
+        child: Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _controller,
+                decoration: const InputDecoration(
+                  hintText: 'Please enter your walking stride.',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Enter your stride';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            StyledButton(
+              onPressed: () async {
+                if (_formKey.currentState!.validate()) {
+                  await widget.addMessage(_controller.text);
+                  _controller.clear();
+                }
+              },
+              child: Row(
+                children: const [
+                  Icon(Icons.send),
+                  SizedBox(width: 4),
+                  Text('SEND'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class UserInfoMessage {
+  UserInfoMessage({required this.name, required this.message});
+  final String name;
+  final String message;
 }
