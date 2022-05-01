@@ -86,7 +86,7 @@ class MainHomePageState extends State<MainHomePage> {
                 const Header('User Info'),
                 UserForm(
                   addMessage: (message) =>
-                  appState.addMessageToUserForm(message),
+                  appState.addStride(message),
                   addEmailToAllow: (email) => appState.addEmailToAllow(email),
                   messages: appState.userMessages,
                 ),
@@ -126,12 +126,12 @@ class ApplicationState extends ChangeNotifier {
     return FirebaseFirestore.instance
     .collection('allowed-emails')
     .doc(FirebaseAuth.instance.currentUser!.email)
-    .set(<String, dynamic> {
+    .update(<String, dynamic> {
         'emails' : FieldValue.arrayUnion([newEmail])
     }).catchError((error) => throw Exception("Failed to add document: $error"));
   }
 
-  Future<void> addMessageToUserForm(String stride) {
+  Future<void> addStride(String stride) {
     if (_loginState != ApplicationLoginState.loggedIn) {
       throw Exception('Must be logged in');
     }
@@ -266,23 +266,23 @@ class UserForm extends StatefulWidget {
 }
 
 class _UserFormState extends State<UserForm> {
-  final _formKey = GlobalKey<FormState>(debugLabel: '_UserFormState');
-  final _controller = TextEditingController();
+  final _strideKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Stride');
+  final _emailKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Email');
+  final _strideController = TextEditingController();
+  final _emailController = TextEditingController();
 
   @override
   Widget build(BuildContext context) =>
   Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Form(
-          key: _formKey,
+      Form(
+          key: _emailKey,
           child: Row(
             children: [
               Expanded(
                 child: TextFormField(
-                  controller: _controller,
+                  controller: _emailController,
                   decoration: const InputDecoration(
                     hintText: 'Enter an email address.',
                   ),
@@ -297,9 +297,9 @@ class _UserFormState extends State<UserForm> {
               const SizedBox(width: 8),
               StyledButton(
                 onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    await widget.addMessage(_controller.text);
-                    _controller.clear();
+                  if (_emailKey.currentState!.validate()) {
+                    await widget.addEmailToAllow(_emailController.text);
+                    _emailController.clear();
                   }
                 },
                 child: Row(
@@ -313,16 +313,13 @@ class _UserFormState extends State<UserForm> {
             ],
           ),
         ),
-      ),
-      Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Form(
-          key: _formKey,
+        Form(
+          key: _strideKey,
           child: Row(
             children: [
               Expanded(
                 child: TextFormField(
-                  controller: _controller,
+                  controller: _strideController,
                   decoration: const InputDecoration(
                     hintText: 'Please enter your walking stride.',
                   ),
@@ -337,9 +334,9 @@ class _UserFormState extends State<UserForm> {
               const SizedBox(width: 8),
               StyledButton(
                 onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    await widget.addMessage(_controller.text);
-                    _controller.clear();
+                  if (_strideKey.currentState!.validate()) {
+                    await widget.addMessage(_strideController.text);
+                    _strideController.clear();
                   }
                 },
                 child: Row(
@@ -353,7 +350,6 @@ class _UserFormState extends State<UserForm> {
             ],
           ),
         ),
-      ),
       const SizedBox(height: 8),
       for (var message in widget.messages)
       Paragraph('${message.name}: ${message.message}'),
