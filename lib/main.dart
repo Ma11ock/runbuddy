@@ -87,6 +87,7 @@ class MainHomePageState extends State<MainHomePage> {
                 UserForm(
                   addMessage: (message) =>
                   appState.addMessageToUserForm(message),
+                  addEmailToAllow: (email) => appState.addEmailToAllow(email),
                   messages: appState.userMessages,
                 ),
               ],
@@ -116,6 +117,20 @@ class ApplicationState extends ChangeNotifier {
     init();
   }
 
+  /// Add [email] to list of emails the user has OK'd to see their data.
+  Future<void> addEmailToAllow(String newEmail) {
+    if (_loginState != ApplicationLoginState.loggedIn) {
+      throw Exception('Must be logged in');
+    }
+
+    return FirebaseFirestore.instance
+    .collection('allowed-emails')
+    .doc(FirebaseAuth.instance.currentUser!.email)
+    .set(<String, dynamic> {
+        'emails' : FieldValue.arrayUnion([newEmail])
+    }).catchError((error) => throw Exception("Failed to add document: $error"));
+  }
+
   Future<void> addMessageToUserForm(String stride) {
     if (_loginState != ApplicationLoginState.loggedIn) {
       throw Exception('Must be logged in');
@@ -129,7 +144,7 @@ class ApplicationState extends ChangeNotifier {
     return FirebaseFirestore.instance
     .collection('run-data')
     .doc(FirebaseAuth.instance.currentUser!.email)
-    .set(<String, dynamic>{
+    .set(<String, dynamic> {
         'stepCM' : iStep,
         'numSteps' : 0,
         'distanceTraveledM' : 0,
@@ -240,8 +255,10 @@ class ApplicationState extends ChangeNotifier {
   }
 }
 class UserForm extends StatefulWidget {
-  const UserForm({required this.addMessage, required this.messages});
+  const UserForm({required this.addMessage, required this.addEmailToAllow,
+      required this.messages});
   final FutureOr<void> Function(String message) addMessage;
+  final FutureOr<void> Function(String message) addEmailToAllow;
   final List<UserInfoMessage> messages;
 
   @override
@@ -257,6 +274,46 @@ class _UserFormState extends State<UserForm> {
   Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
+      Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Form(
+          key: _formKey,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _controller,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter an email address.',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter an email address.';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              StyledButton(
+                onPressed: () async {
+                  if (_formKey.currentState!.validate()) {
+                    await widget.addMessage(_controller.text);
+                    _controller.clear();
+                  }
+                },
+                child: Row(
+                  children: const [
+                    Icon(Icons.send),
+                    SizedBox(width: 4),
+                    Text('SEND'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       Padding(
         padding: const EdgeInsets.all(8.0),
         child: Form(
@@ -299,7 +356,7 @@ class _UserFormState extends State<UserForm> {
       ),
       const SizedBox(height: 8),
       for (var message in widget.messages)
-        Paragraph('${message.name}: ${message.message}'),
+      Paragraph('${message.name}: ${message.message}'),
       const SizedBox(height: 8),
     ]
   );
