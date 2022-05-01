@@ -9,8 +9,11 @@ import 'package:neat_periodic_task/neat_periodic_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
-
+/// Bluetooth button. Maintains the bluetooth in global state, or whereever this
+/// button is present.
 class BlueButton extends FloatingActionButton {
+  /// Create a bluetooth button with a default pressed function that toggles reading
+  /// from the device.
   BlueButton() : super(
     onPressed: () {
       if(readTimer != null) {
@@ -28,6 +31,7 @@ class BlueButton extends FloatingActionButton {
     },
     child: const Icon(Icons.bluetooth));
 
+  /// Create a static timer that reads from [char] every [timeIntervalMs] milliseconds.
   static void createReadTimer(BluetoothCharacteristic char,
     int timeIntervalMs) {
     if(readTimer != null) {
@@ -65,7 +69,7 @@ class BlueButton extends FloatingActionButton {
       },
       interval: Duration(milliseconds: timeIntervalMs),
       minCycle: Duration(milliseconds: timeIntervalMs ~/ 2 - 1),
-      name: 'bt-reader${btCounters++}',
+      name: 'bt-reader',
       timeout: Duration(milliseconds: timeIntervalMs * 2),
     );
 
@@ -74,41 +78,67 @@ class BlueButton extends FloatingActionButton {
         readTimer?.start();
     });
 
+    // Set global state for tracking.
     characteristic = char;
     BlueButton.timeIntervalMs = timeIntervalMs;
   }
 
+  /// Set the characteristic to read. Resets the timer.
   static void setCharacteristic(BluetoothCharacteristic btc) {
     characteristic = btc;
+    createReadTimer(btc, timeIntervalMs);
   }
 
   static void unsetCharacteristic() {
     characteristic = null;
+    if(readTimer != null) {
+      readTimer!.stop();
+      readTimer = null;
+    }
   }
 
+  /// Toggle the read state. If shouldRead is now true, start the timer. If it is
+  /// now false, stop it.
   static void toggleRead() {
     shouldRead = !shouldRead;
+    if(readTimer != null) {
+      if(shouldRead && characteristic != null) {
+        createReadTimer(characteristic!, timeIntervalMs);
+      } else {
+        readTimer!.stop();
+        readTimer = null;
+      }
+    }
   }
 
+  /// Get the read value fromt the read vector.
   static List<int>? getRValue() {
     return readValues[characteristic!.uuid];
   }
 
+  /// Time interval in milliseconds to read from bluetooth.
   static int timeIntervalMs = 1000;
+  /// If true, should read from the bluetooth device. If false, stop reading.
   static bool shouldRead = false;
+  /// The characteristic to read from.
   static BluetoothCharacteristic? characteristic;
-  static int btCounters = 0;
+  /// The read timer. Reads the bluetooth device.
   static NeatPeriodicTaskScheduler? readTimer;
   // The last time the bluetooth device was read from.
   static DateTime lastTimeRead = DateTime.now();
   // Time interval between reads (milliseconds).
   static bool isReading = false;
+  /// Queue of messages from the bluetooth device.
   static final Queue<Map<String, dynamic>> messageQueue = Queue();
+  /// Variable for testing. If true, do not render the JSON recieved from the device.
   static bool testDoNotMakeTree = false;
+  /// The FlutterBlue instance.
   static final FlutterBlue flutterBlue = FlutterBlue.instance;
+  /// Read values from the bluetooth device.
   static final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
 }
 
+/// Flutter window area. 
 class BlueWidget extends StatelessWidget {
   const BlueWidget({Key? key}) : super(key: key);
 
@@ -122,22 +152,31 @@ class BlueWidget extends StatelessWidget {
   );
 }
 
+/// Flutter window state.
 class BlueHomePage extends StatefulWidget {
   BlueHomePage({Key? key, required this.title}) : super(key: key);
 
+  /// Title of the window.
   final String title;
+  /// List of potential Bluetooth devices.
   final List<BluetoothDevice> devicesList = <BluetoothDevice>[];
+  /// Read values from the GUID devices.
   final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
 
   @override
   _BlueHomePageState createState() => _BlueHomePageState();
 }
 
+/// State of the window widget.
 class _BlueHomePageState extends State<BlueHomePage> {
+  /// For displaying the JSON response.
   final _writeController = TextEditingController();
+  /// Current connected device.
   BluetoothDevice? _connectedDevice;
+  /// Services offered by the current device.
   late List<BluetoothService> _services;
 
+  /// Add a device to the screen upon discovery.
   void _addDeviceTolist(final BluetoothDevice device) {
     if (!widget.devicesList.contains(device)) {
       setState(() {
@@ -146,9 +185,11 @@ class _BlueHomePageState extends State<BlueHomePage> {
     }
   }
 
+  /// Initialize the state of the window.
   @override
   void initState() {
     super.initState();
+    // Get all nearby devies.
     BlueButton.flutterBlue.connectedDevices
     .asStream()
     .listen((List<BluetoothDevice> devices) {
@@ -156,6 +197,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
           _addDeviceTolist(device);
         }
     });
+    // Display everything.
     BlueButton.flutterBlue.scanResults.listen((List<ScanResult> results) {
         for (ScanResult result in results) {
           _addDeviceTolist(result.device);
@@ -164,6 +206,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
     BlueButton.flutterBlue.startScan();
   }
 
+  /// Build the view of the devices.
   ListView _buildListViewOfDevices() {
     List<Container> containers = <Container>[];
     for (BluetoothDevice device in widget.devicesList) {
@@ -217,6 +260,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
     );
   }
 
+  /// Build the button used to read.
   List<ButtonTheme> _buildReadWriteNotifyButton(
     BluetoothCharacteristic characteristic) {
     List<ButtonTheme> buttons = <ButtonTheme>[];
@@ -292,6 +336,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
     return buttons;
   }
 
+  /// Show list of the connected deive and the services it offers.
   ListView _buildConnectDeviceView() {
     List<Container> containers = <Container>[];
 
@@ -348,6 +393,7 @@ class _BlueHomePageState extends State<BlueHomePage> {
     return _buildListViewOfDevices();
   }
 
+  /// Build the window.
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -366,13 +412,18 @@ class _BlueHomePageState extends State<BlueHomePage> {
   );
 }
 
+/// Helper function used to print stand-out [text].
 void printInfo(String text) {
   print('\x1B[33m$text\x1B[0m');
 }
 
+/// Display the JSON response.
 class JSONScreen extends StatefulWidget {
+  /// The device currently being displayed.
   final BluetoothDevice device;
+  /// The read values from the device.
   final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
+  /// Current characteristic being read.
   final BluetoothCharacteristic characteristic;
   JSONScreen({Key? key, required this.device,
       required this.characteristic}) :
@@ -383,11 +434,14 @@ class JSONScreen extends StatefulWidget {
 }
 
 class JSONScreenState extends State<JSONScreen> {
+  /// Time interval we should update the screen.
   static int timeIntervalMs = 1000;
+  /// True if we should update the screen.
   static bool shouldUpdate = false;
-
+  /// Timer for updating the screen.
   late NeatPeriodicTaskScheduler readTimer;
 
+  /// Create the update screen timer for this JSON window.
   void initTimer() {
     printInfo("Creating read timer");
     readTimer = NeatPeriodicTaskScheduler(
@@ -406,6 +460,7 @@ class JSONScreenState extends State<JSONScreen> {
     readTimer.start();
   }
 
+  /// Build the JSON text widget.
   Widget jsonResponseTree() {
     if(!shouldUpdate) {
       return const Text("Nothing for now...");
