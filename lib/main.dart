@@ -118,25 +118,29 @@ class ApplicationState extends ChangeNotifier {
       throw Exception('Must be logged in');
     }
 
-    Future<void> result;
-    var theDoc = await FirebaseFirestore.instance
+    FirebaseFirestore.instance
     .collection('userData')
     .doc(group)
     .get()
-    .catchError((error) => throw Exception("Failed to get $group, could not add to group."));
+    .then((DocumentSnapshot theDoc) {
+        printInfo("we got the doc from $group, and it ${theDoc.exists ? 'does' : 'does not'} exist");
+        if(theDoc.exists && theDoc.get("allowedEmails").contains(FirebaseAuth.instance.currentUser!.email)) {
+          FirebaseFirestore.instance
+          .collection('userData')
+          .doc(group)
+          .update(<String, dynamic> {
+              'groupMates' : FieldValue.arrayUnion([FirebaseAuth.instance.currentUser!.email])
+          }).catchError((error) => throw Exception("Failed to add document: $error"));
+        } else {
+          printInfo("Group permission error");
+          throw Exception("The group you tried to join either doesn't exist or has not let you in.");
+        }
+    })
+    .catchError((error) {
+        printInfo("Could not join the group.");
+        throw Exception("Failed to get $group, could not add to group.");
+    });
 
-    if(theDoc.exists && theDoc
-      .get("allowedEmails")
-      .contains(FirebaseAuth.instance.currentUser!.email)) {
-      result = FirebaseFirestore.instance
-      .collection('userData')
-      .doc(group)
-      .update(<String, dynamic> {
-          'groupMates' : FieldValue.arrayUnion([FirebaseAuth.instance.currentUser!.email])
-      }).catchError((error) => throw Exception("Failed to add document: $error"));
-      printInfo("Group permission error");
-      throw Exception("The group you tried to join either doesn't exist or has not let you in.");
-    }
   }
 
   /// Add [email] to list of emails the user has OK'd to see their data.
