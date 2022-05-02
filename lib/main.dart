@@ -18,6 +18,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
+import 'package:intl/intl.dart';
 
 import './blue.dart';
 import './widgets.dart';
@@ -211,7 +212,12 @@ class ApplicationState extends ChangeNotifier {
                 _userMessages.add(
                   UserInfoMessage(
                     name: document.data()['name'] as String,
-                    message: document.data()['email'] as String,
+                    email: document.data()['email'] as String,
+                    numSteps: document.data()['numSteps'] as int,
+                    stepCM: document.data()['stepCM'] as int,
+                    lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.data()['timestamp'] as int),
+                    distanceTraveled: document.data()['distanceTraveledM'] as int,
+                    groupMates: List<String>.from(document.data()['groupMates'] as List<dynamic>),
                   ),
                 );
               }
@@ -437,15 +443,27 @@ class _UserFormState extends State<UserForm> {
       ),
       const SizedBox(height: 8),
       for (var message in widget.messages)
-      Paragraph('${message.name}: ${message.message}'),
+      Paragraph('${message.toString()}'),
       const SizedBox(height: 8),
     ]
   );
 }
 
+/// User metadata to draw.
 class UserInfoMessage {
-  UserInfoMessage({required this.name, required this.message});
+  UserInfoMessage({required this.name, required this.email, required this.numSteps,
+      required this.stepCM, required this.lastUpdated, required this.distanceTraveled,
+      required this.groupMates});
   final String name;
-  final String message;
-  // TODO add other fields.
+  final String email;
+  final int numSteps;
+  final int stepCM;
+  final DateTime lastUpdated;
+  final int distanceTraveled;
+  final List<String> groupMates;
+
+  String toString() {
+    final DateFormat formatter = DateFormat('yyyy-MM-dd:mm');
+    return '$name : $email $numSteps $stepCM ${formatter.format(lastUpdated)} $distanceTraveled $groupMates';
+  }
 }
