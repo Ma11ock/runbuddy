@@ -5,16 +5,16 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:neat_periodic_task/neat_periodic_task.dart';
 
-import 'package:firebase_auth/firebase_auth.dart'; // new
-import 'package:firebase_core/firebase_core.dart'; // new
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';           // new
+import 'package:provider/provider.dart';
 
-import 'firebase_options.dart';                    // new
-import 'authentication.dart';                  // new
+import 'firebase_options.dart';
+import 'authentication.dart';
 import 'widgets.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';  // new
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
@@ -40,8 +40,6 @@ class Runbuddy extends StatelessWidget {
     theme: ThemeData(
       primarySwatch: Colors.blue,
     ),
-    // Add from here
-    // to here
   );
 }
 
@@ -85,16 +83,15 @@ class MainHomePageState extends State<MainHomePage> {
               if (appState.loginState == ApplicationLoginState.loggedIn) ...[
                 const Header('User Info'),
                 UserForm(
-                  addMessage: (message) =>
-                  appState.addStride(message),
+                  addMessage: (message) => appState.addStride(message),
                   addEmailToAllow: (email) => appState.addEmailToAllow(email),
+                  addToGroup: (group) => appState.addToGroup(group),
                   messages: appState.userMessages,
                 ),
               ],
             ],
           ),
         ),
-        // To here.
       ],
     ),
   );
@@ -108,13 +105,38 @@ class ApplicationState extends ChangeNotifier {
   String? _email;
   String? get email => _email;
 
-  // Add from here
   StreamSubscription<QuerySnapshot>? _userMessageSubscription;
   List<UserInfoMessage> _userMessages = [];
   List<UserInfoMessage> get userMessages => _userMessages;
-  // to here.
   ApplicationState() {
     init();
+  }
+
+  /// Add the logged in user to [group]'s group.
+  Future<void> addToGroup(String group) async {
+    if (_loginState != ApplicationLoginState.loggedIn) {
+      throw Exception('Must be logged in');
+    }
+
+    Future<void> result;
+    var theDoc = await FirebaseFirestore.instance
+    .collection('userData')
+    .doc(group)
+    .get()
+    .catchError((error) => throw Exception("Failed to get $group, could not add to group."));
+
+    if(theDoc.exists && theDoc
+      .get("allowedEmails")
+      .contains(FirebaseAuth.instance.currentUser!.email)) {
+      result = FirebaseFirestore.instance
+      .collection('userData')
+      .doc(group)
+      .update(<String, dynamic> {
+          'groupMates' : FieldValue.arrayUnion([FirebaseAuth.instance.currentUser!.email])
+      }).catchError((error) => throw Exception("Failed to add document: $error"));
+      printInfo("Group permission error");
+      throw Exception("The group you tried to join either doesn't exist or has not let you in.");
+    }
   }
 
   /// Add [email] to list of emails the user has OK'd to see their data.
@@ -124,10 +146,10 @@ class ApplicationState extends ChangeNotifier {
     }
 
     return FirebaseFirestore.instance
-    .collection('allowed-emails')
+    .collection('userData')
     .doc(FirebaseAuth.instance.currentUser!.email)
     .update(<String, dynamic> {
-        'emails' : FieldValue.arrayUnion([newEmail])
+        'allowedEmails' : FieldValue.arrayUnion([newEmail])
     }).catchError((error) => throw Exception("Failed to add document: $error"));
   }
 
@@ -142,7 +164,7 @@ class ApplicationState extends ChangeNotifier {
     }
 
     return FirebaseFirestore.instance
-    .collection('run-data')
+    .collection('userData')
     .doc(FirebaseAuth.instance.currentUser!.email)
     .set(<String, dynamic> {
         'stepCM' : iStep,
@@ -153,6 +175,7 @@ class ApplicationState extends ChangeNotifier {
         'email': FirebaseAuth.instance.currentUser!.email,
         'name': FirebaseAuth.instance.currentUser!.displayName,
         'userId': FirebaseAuth.instance.currentUser!.uid,
+        'groupMates' : [],
     }).catchError((error) => throw Exception("Failed to add document: $error"));
   }
 
@@ -164,9 +187,8 @@ class ApplicationState extends ChangeNotifier {
     FirebaseAuth.instance.userChanges().listen((user) {
         if (user != null) {
           _loginState = ApplicationLoginState.loggedIn;
-          // Add from here
           _userMessageSubscription = FirebaseFirestore.instance
-          .collection('run-data')
+          .collection('userData')
           .orderBy('timestamp', descending: true)
           .limit(1)
           .snapshots()
@@ -256,9 +278,10 @@ class ApplicationState extends ChangeNotifier {
 }
 class UserForm extends StatefulWidget {
   const UserForm({required this.addMessage, required this.addEmailToAllow,
-      required this.messages});
+      required this.addToGroup, required this.messages});
   final FutureOr<void> Function(String message) addMessage;
-  final FutureOr<void> Function(String message) addEmailToAllow;
+  final FutureOr<void> Function(String email) addEmailToAllow;
+  final FutureOr<void> Function(String groupName) addToGroup;
   final List<UserInfoMessage> messages;
 
   @override
@@ -268,15 +291,20 @@ class UserForm extends StatefulWidget {
 class _UserFormState extends State<UserForm> {
   final _strideKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Stride');
   final _emailKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Email');
+  final _groupKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Email');
+
   final _strideController = TextEditingController();
   final _emailController = TextEditingController();
+  final _groupController = TextEditingController();
 
   @override
   Widget build(BuildContext context) =>
   Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Form(
+      Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Form(
           key: _emailKey,
           child: Row(
             children: [
@@ -312,8 +340,51 @@ class _UserFormState extends State<UserForm> {
               ),
             ],
           ),
+        )
+      ),
+      Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Form(
+          key: _groupKey,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _groupController,
+                  decoration: const InputDecoration(
+                    hintText: 'Please enter an email to add to the group',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Enter an email to join a group.';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              StyledButton(
+                onPressed: () async {
+                  if (_groupKey.currentState!.validate()) {
+                    await widget.addToGroup(_groupController.text);
+                    _groupController.clear();
+                  }
+                },
+                child: Row(
+                  children: const [
+                    Icon(Icons.send),
+                    SizedBox(width: 4),
+                    Text('SEND'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        Form(
+      ),
+      Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Form(
           key: _strideKey,
           child: Row(
             children: [
@@ -350,6 +421,7 @@ class _UserFormState extends State<UserForm> {
             ],
           ),
         ),
+      ),
       const SizedBox(height: 8),
       for (var message in widget.messages)
       Paragraph('${message.name}: ${message.message}'),

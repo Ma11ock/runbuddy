@@ -138,7 +138,7 @@ class BlueButton extends FloatingActionButton {
   static final Map<Guid, List<int>> readValues = <Guid, List<int>>{};
 }
 
-/// Flutter window area. 
+/// Flutter window area.
 class BlueWidget extends StatelessWidget {
   const BlueWidget({Key? key}) : super(key: key);
 
