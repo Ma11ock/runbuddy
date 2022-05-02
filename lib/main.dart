@@ -118,6 +118,7 @@ class ApplicationState extends ChangeNotifier {
       throw Exception('Must be logged in');
     }
 
+    // If the permissions allow it, add the current user to the other user's group.
     FirebaseFirestore.instance
     .collection('userData')
     .doc(group)
@@ -133,8 +134,16 @@ class ApplicationState extends ChangeNotifier {
           }).catchError((error) => throw Exception("Failed to add document: $error"));
         } else {
           printInfo("Group permission error");
-          throw Exception("The group you tried to join either doesn't exist or has not let you in.");
+          throw Exception("The group you tried to join either doesn\'t exist or has not let you in.");
         }
+        // Add the other user to the current user's group.
+        FirebaseFirestore.instance
+        .collection('userData')
+        .doc(FirebaseAuth.instance.currentUser!.email)
+        .update(<String, dynamic> {
+            'allowedEmails' : FieldValue.arrayUnion([group]),
+            'groupMates' : FieldValue.arrayUnion([group]),
+        }).catchError((error) => throw Exception("Failed to add document: $error"));
     })
     .catchError((error) {
         printInfo("Could not join the group.");
