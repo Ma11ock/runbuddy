@@ -53,17 +53,15 @@ class BlueButton extends FloatingActionButton {
         // Set state function.
         Map<String, dynamic> readResponse = {};
         readValues[char.uuid] = rValue;
-        printInfo("The BT data is $btData and the raw data is ${rawBtData.toString()}");
-        //try {
-        // Would be used in an actual app.
-        //readResponse = const JsonDecoder().convert(btData);
-        // Check for change in time interval.
-        readResponse["time"] = {"stamp": btData};
+        printInfo("The BT data is  and the raw data is ${rawBtData.toString()} $btData");
+        try {
+          readResponse = const JsonDecoder().convert(btData);
+          // Check for change in time interval.
 
-        messageQueue.add(readResponse);
-        //} on FormatException catch (_, e){
-        //   readResponse["String"] = btData as dynamic;
-        //}
+          messageQueue.add(readResponse);
+        } on FormatException catch (_, e) {
+          readResponse["String"] = btData as dynamic;
+        }
         lastTimeRead = DateTime.now();
         sub.cancel();
       },
