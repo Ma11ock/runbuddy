@@ -23,6 +23,8 @@ import 'package:intl/intl.dart';
 import './blue.dart';
 import './widgets.dart';
 
+var rng = Random();
+
 void main() => runApp(ChangeNotifierProvider(
     create: (context) => ApplicationState(),
     builder: (context, _) => const Runbuddy(),
@@ -88,6 +90,7 @@ class MainHomePageState extends State<MainHomePage> {
                   addEmailToAllow: (email) => appState.addEmailToAllow(email),
                   addToGroup: (group) => appState.addToGroup(group),
                   messages: appState.userMessages,
+                  runData: appState.runData,
                 ),
               ],
             ],
@@ -99,11 +102,19 @@ class MainHomePageState extends State<MainHomePage> {
 
 }
 
+/// Data from a run.
 class RunData {
   RunData({required this.distance, required this.heartRate});
 
+  /// Distance traveled since last bluetooth transmission.
   List<int> distance = [];
+  /// User's current heart rate from last transmission.
   List<int> heartRate = [];
+
+  /// Convert to a string.
+  String toString() {
+    return 'Distance: $distance, Heart Rate: $heartRate';
+  }
 }
 
 class ApplicationState extends ChangeNotifier {
@@ -120,6 +131,19 @@ class ApplicationState extends ChangeNotifier {
   RunData get runData => _runData;
   ApplicationState() {
     init();
+  }
+
+  NeatPeriodicTaskScheduler? testSched;
+
+  /// Send the run data [rd] to the Firestore.
+  Future<void> sendRunData(RunData rd) {
+    return FirebaseFirestore.instance
+    .collection('runData')
+    .doc(FirebaseAuth.instance.currentUser!.email)
+    .update(<String, dynamic> {
+        'distance' : FieldValue.arrayUnion(rd.distance),
+        'heartRate' : FieldValue.arrayUnion(rd.heartRate),
+    }).catchError((error) => throw Exception("Failed to add run data: $error"));
   }
 
   /// Add the logged in user to [group]'s group.
@@ -200,6 +224,7 @@ class ApplicationState extends ChangeNotifier {
         'name': FirebaseAuth.instance.currentUser!.displayName,
         'userId': FirebaseAuth.instance.currentUser!.uid,
         'groupMates' : [],
+        'allowedEmails' : [],
     }).catchError((error) => throw Exception("Failed to add document: $error"));
 
     // Add rundata entry.
@@ -268,13 +293,14 @@ class ApplicationState extends ChangeNotifier {
     // Subscribe to our data stream.
     FirebaseAuth.instance.userChanges().listen((user) {
         if (user != null) {
+          // Subscribe to our data stream.
           _dataSubscription = FirebaseFirestore.instance
-          .collection('userData')
+          .collection('runData')
           .doc(FirebaseAuth.instance.currentUser!.email)
           .snapshots()
           .listen((snapshot) async {
-              _runData.distance = snapshot.data()!['distance'] ?? [0];
-              _runData.heartRate = snapshot.data()!['heartRate'] ?? [0];
+              _runData.distance = List<int>.from(snapshot.data()!['distance'] ?? [0]);
+              _runData.heartRate = List<int>.from(snapshot.data()!['heartRate'] ?? [0]);
           });
         } else {
           _loginState = ApplicationLoginState.loggedOut;
@@ -284,6 +310,19 @@ class ApplicationState extends ChangeNotifier {
         }
         notifyListeners();
     });
+
+    testSched = NeatPeriodicTaskScheduler(
+      task: () async {
+        sendRunData(RunData(distance: [rng.nextInt(69), rng.nextInt(420)],
+            heartRate: [rng.nextInt(69), rng.nextInt(420)]));
+      },
+      interval: const Duration(milliseconds: 10000),
+      minCycle: const Duration(milliseconds: 10000 ~/ 2 - 1),
+      name: 'bt-reader',
+      timeout: const Duration(milliseconds: 10000 * 2),
+    );
+
+    //testSched!.start();
   }
 
   void startLoginFlow() {
@@ -351,11 +390,12 @@ class ApplicationState extends ChangeNotifier {
 }
 class UserForm extends StatefulWidget {
   const UserForm({required this.addMessage, required this.addEmailToAllow,
-      required this.addToGroup, required this.messages});
+      required this.addToGroup, required this.messages, required this.runData});
   final FutureOr<void> Function(String message) addMessage;
   final FutureOr<void> Function(String email) addEmailToAllow;
   final FutureOr<void> Function(String groupName) addToGroup;
   final List<UserInfoMessage> messages;
+  final RunData runData;
 
   @override
   _UserFormState createState() => _UserFormState();
@@ -364,7 +404,7 @@ class UserForm extends StatefulWidget {
 class _UserFormState extends State<UserForm> {
   final _strideKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Stride');
   final _emailKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Email');
-  final _groupKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Email');
+  final _groupKey = GlobalKey<FormState>(debugLabel: '_UserFormState:Group');
 
   final _strideController = TextEditingController();
   final _emailController = TextEditingController();
@@ -497,7 +537,8 @@ class _UserFormState extends State<UserForm> {
       ),
       const SizedBox(height: 8),
       for (var message in widget.messages)
-      Paragraph('${message.toString()}'),
+        Paragraph('${message.toString()}'),
+      Paragraph(widget.runData.toString()),
       const SizedBox(height: 8),
     ]
   );
