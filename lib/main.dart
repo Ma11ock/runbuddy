@@ -105,8 +105,7 @@ class ApplicationState extends ChangeNotifier {
 
   String? _email;
   String? get email => _email;
-
-  StreamSubscription<QuerySnapshot>? _userMessageSubscription;
+  StreamSubscription<DocumentSnapshot>? _userMessageSubscription;
   List<UserInfoMessage> _userMessages = [];
   List<UserInfoMessage> get userMessages => _userMessages;
   ApplicationState() {
@@ -203,24 +202,21 @@ class ApplicationState extends ChangeNotifier {
           _loginState = ApplicationLoginState.loggedIn;
           _userMessageSubscription = FirebaseFirestore.instance
           .collection('userData')
-          .orderBy('timestamp', descending: true)
-          .limit(1)
+          .doc(FirebaseAuth.instance.currentUser!.email)
           .snapshots()
-          .listen((snapshot) {
+          .listen((document) {
               _userMessages = [];
-              for (final document in snapshot.docs) {
-                _userMessages.add(
-                  UserInfoMessage(
-                    name: document.data()['name'] as String,
-                    email: document.data()['email'] as String,
-                    numSteps: document.data()['numSteps'] as int,
-                    stepCM: document.data()['stepCM'] as int,
-                    lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.data()['timestamp'] as int),
-                    distanceTraveled: document.data()['distanceTraveledM'] as int,
-                    groupMates: List<String>.from(document.data()['groupMates'] as List<dynamic>),
-                  ),
-                );
-              }
+              _userMessages.add(
+                UserInfoMessage(
+                  name: document.data()!['name'] as String,
+                  email: document.data()!['email'] as String,
+                  numSteps: document.data()!['numSteps'] as int,
+                  stepCM: document.data()!['stepCM'] as int,
+                  lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.data()!['timestamp'] as int),
+                  distanceTraveled: document.data()!['distanceTraveledM'] as int,
+                  groupMates: List<String>.from(document.data()!['groupMates'] as List<dynamic>),
+                ),
+              );
               notifyListeners();
           });
         } else {
