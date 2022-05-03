@@ -105,7 +105,7 @@ class ApplicationState extends ChangeNotifier {
 
   String? _email;
   String? get email => _email;
-  StreamSubscription<DocumentSnapshot>? _userMessageSubscription;
+  StreamSubscription<QuerySnapshot>? _userMessageSubscription;
   List<UserInfoMessage> _userMessages = [];
   List<UserInfoMessage> get userMessages => _userMessages;
   ApplicationState() {
@@ -202,21 +202,37 @@ class ApplicationState extends ChangeNotifier {
           _loginState = ApplicationLoginState.loggedIn;
           _userMessageSubscription = FirebaseFirestore.instance
           .collection('userData')
-          .doc(FirebaseAuth.instance.currentUser!.email)
           .snapshots()
-          .listen((document) {
+          .listen((snapshot) async {
+              List<String> allowedEmails = [];
+              try {
+                allowedEmails = List<String>.from(
+                  ((await FirebaseFirestore.instance
+                      .collection('userData')
+                      .doc(FirebaseAuth.instance.currentUser!.email)
+                      .get())
+                    .get("allowedEmails") ?? []) as List<dynamic>
+                );
+              } catch (e) {
+                printInfo("Error when making allowed emails list: $e");
+              }
               _userMessages = [];
-              _userMessages.add(
-                UserInfoMessage(
-                  name: document.data()!['name'] as String,
-                  email: document.data()!['email'] as String,
-                  numSteps: document.data()!['numSteps'] as int,
-                  stepCM: document.data()!['stepCM'] as int,
-                  lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.data()!['timestamp'] as int),
-                  distanceTraveled: document.data()!['distanceTraveledM'] as int,
-                  groupMates: List<String>.from(document.data()!['groupMates'] as List<dynamic>),
-                ),
-              );
+              for(final document in snapshot.docs) {
+                // Exclude user messages we're not subscribed to.
+                if(document.data()['email'] != FirebaseAuth.instance.currentUser!.email &&
+                  !allowedEmails.contains(document.data()['email'] ?? "-")) {
+                  continue;
+                }
+                userMessages.add(UserInfoMessage(
+                    name: document.data()['name'] as String,
+                    email: document.data()['email'] as String,
+                    numSteps: document.data()['numSteps'] as int,
+                    stepCM: document.data()['stepCM'] as int,
+                    lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.data()['timestamp'] as int),
+                    distanceTraveled: document.data()['distanceTraveledM'] as int,
+                    groupMates: List<String>.from(document.data()['groupMates'] as List<dynamic>),
+                ));
+              }
               notifyListeners();
           });
         } else {
