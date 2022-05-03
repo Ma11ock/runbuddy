@@ -99,6 +99,13 @@ class MainHomePageState extends State<MainHomePage> {
 
 }
 
+class RunData {
+  RunData({required this.distance, required this.heartRate});
+
+  List<int> distance = [];
+  List<int> heartRate = [];
+}
+
 class ApplicationState extends ChangeNotifier {
   ApplicationLoginState _loginState = ApplicationLoginState.loggedOut;
   ApplicationLoginState get loginState => _loginState;
@@ -106,8 +113,11 @@ class ApplicationState extends ChangeNotifier {
   String? _email;
   String? get email => _email;
   StreamSubscription<QuerySnapshot>? _userMessageSubscription;
+  StreamSubscription<DocumentSnapshot>? _dataSubscription;
   List<UserInfoMessage> _userMessages = [];
   List<UserInfoMessage> get userMessages => _userMessages;
+  final RunData _runData = RunData(distance: [], heartRate: []);
+  RunData get runData => _runData;
   ApplicationState() {
     init();
   }
@@ -166,7 +176,7 @@ class ApplicationState extends ChangeNotifier {
     }).catchError((error) => throw Exception("Failed to add document: $error"));
   }
 
-  Future<void> addStride(String stride) {
+  Future<void> addStride(String stride) async {
     if (_loginState != ApplicationLoginState.loggedIn) {
       throw Exception('Must be logged in');
     }
@@ -176,7 +186,8 @@ class ApplicationState extends ChangeNotifier {
       throw Exception('Stride must be a number');
     }
 
-    return FirebaseFirestore.instance
+    // Add metadata entry.
+    FirebaseFirestore.instance
     .collection('userData')
     .doc(FirebaseAuth.instance.currentUser!.email)
     .set(<String, dynamic> {
@@ -190,6 +201,15 @@ class ApplicationState extends ChangeNotifier {
         'userId': FirebaseAuth.instance.currentUser!.uid,
         'groupMates' : [],
     }).catchError((error) => throw Exception("Failed to add document: $error"));
+
+    // Add rundata entry.
+    return FirebaseFirestore.instance
+    .collection('runData')
+    .doc(FirebaseAuth.instance.currentUser!.email)
+    .set(<String, dynamic> {
+        'distance': [0],
+        'heartRate': [0],
+    }).catchError((error) => throw Exception("Failed to add document: $error"));
   }
 
   Future<void> init() async {
@@ -197,6 +217,7 @@ class ApplicationState extends ChangeNotifier {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    // Get user metadata and filter by group.
     FirebaseAuth.instance.userChanges().listen((user) {
         if (user != null) {
           _loginState = ApplicationLoginState.loggedIn;
@@ -239,6 +260,27 @@ class ApplicationState extends ChangeNotifier {
           _loginState = ApplicationLoginState.loggedOut;
           _userMessages = [];
           _userMessageSubscription?.cancel();
+          _dataSubscription?.cancel();
+        }
+        notifyListeners();
+    });
+
+    // Subscribe to our data stream.
+    FirebaseAuth.instance.userChanges().listen((user) {
+        if (user != null) {
+          _dataSubscription = FirebaseFirestore.instance
+          .collection('userData')
+          .doc(FirebaseAuth.instance.currentUser!.email)
+          .snapshots()
+          .listen((snapshot) async {
+              _runData.distance = snapshot.data()!['distance'] ?? [0];
+              _runData.heartRate = snapshot.data()!['heartRate'] ?? [0];
+          });
+        } else {
+          _loginState = ApplicationLoginState.loggedOut;
+          _userMessages = [];
+          _userMessageSubscription?.cancel();
+          _dataSubscription?.cancel();
         }
         notifyListeners();
     });
