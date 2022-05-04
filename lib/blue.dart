@@ -5,7 +5,6 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:neat_periodic_task/neat_periodic_task.dart';
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
@@ -14,7 +13,7 @@ import 'package:flutter_blue/flutter_blue.dart';
 class BlueButton extends FloatingActionButton {
   /// Create a bluetooth button with a default pressed function that toggles reading
   /// from the device.
-  BlueButton() : super(
+  BlueButton(Function() callback) : super(
     onPressed: () {
       if(readTimer != null) {
         shouldRead = !shouldRead;
@@ -28,6 +27,8 @@ class BlueButton extends FloatingActionButton {
       } else {
         printInfo("Warn: Bluetooth not set up.");
       }
+
+      callback();
     },
     child: const Icon(Icons.bluetooth));
 

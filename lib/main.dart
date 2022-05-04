@@ -27,6 +27,11 @@ import 'package:intl/intl.dart';
 import './blue.dart';
 import './widgets.dart';
 
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
+
 var rng = Random();
 bool valueNotif = true;
 
@@ -94,22 +99,29 @@ class MainHomePageState extends State<MainHomePage> {
     appBar: AppBar(title: const Text('Main App')),
     body: Column(
       children: [
-        RaisedButton(
-          child: const Text('Go to Bluetooth'),
-          onPressed: () {
-            Navigator.pushNamed(context, '/blue');
-        }),
-        Transform.scale(
-          scale: 2,
-          child: Switch(
-            value: valueNotif,
-            onChanged: (value) => setState(() => valueNotif = value),
-          ),
-        ),
-        Consumer<ApplicationState>(
-          builder: (context, appState, _) => BlueButton(() {
-              appState.purgeAndCalc();
-          }),
+        Row(
+          children: [
+            const SizedBox(width: 8),
+            RaisedButton(
+              child: const Text('Go to Bluetooth'),
+              onPressed: () {
+                Navigator.pushNamed(context, '/blue');
+            }),
+            const SizedBox(width: 8),
+            Transform.scale(
+              scale: 2,
+              child: Switch(
+                value: valueNotif,
+                onChanged: (value) => setState(() => valueNotif = value),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Consumer<ApplicationState>(
+              builder: (context, appState, _) => BlueButton(() {
+                  appState.purgeAndCalc();
+              }),
+            ),
+          ]
         ),
         Consumer<ApplicationState>(
           builder: (context, appState, _) => Authentication(
@@ -388,7 +400,7 @@ class ApplicationState extends ChangeNotifier {
       timeout: const Duration(milliseconds: 10000 * 2),
     );
 
-    testSched!.start();
+    //testSched!.start();
   }
 
   void startLoginFlow() {
