@@ -8,6 +8,10 @@ import 'package:neat_periodic_task/neat_periodic_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
+import './main.dart';
+
+Map<String, dynamic> readResponse = {};
+
 /// Bluetooth button. Maintains the bluetooth in global state, or whereever this
 /// button is present.
 class BlueButton extends FloatingActionButton {
@@ -52,16 +56,27 @@ class BlueButton extends FloatingActionButton {
         List<int> rawBtData = await char.read();
         String btData = String.fromCharCodes(rawBtData);
         // Set state function.
-        Map<String, dynamic> readResponse = {};
         readValues[char.uuid] = rValue;
         printInfo("The BT data is  and the raw data is ${rawBtData.toString()} $btData");
         try {
-          readResponse = const JsonDecoder().convert(btData);
+          readResponse = JsonDecoder().convert(btData);
           // Check for change in time interval.
-
-          messageQueue.add(readResponse);
-        } on FormatException catch (_, e) {
+        } catch(e) {
           readResponse["String"] = btData as dynamic;
+          printInfo(
+            'we DID NOT read because $e'
+          );
+        }
+
+        try {
+          messageQueue.add(RunDatum(hr: (readResponse['HR'] as double).toInt(),
+              //dist: int.parse(readResponse['dist'])));
+              dist: 0));
+          printInfo(
+            'we read ${messageQueue.last.hr} HR'
+          );
+        } catch(e) {
+          printInfo('failed to add message to q because $e');
         }
         lastTimeRead = DateTime.now();
         sub.cancel();
@@ -128,7 +143,7 @@ class BlueButton extends FloatingActionButton {
   // Time interval between reads (milliseconds).
   static bool isReading = false;
   /// Queue of messages from the bluetooth device.
-  static final Queue<Map<String, dynamic>> messageQueue = Queue();
+  static final List<RunDatum> messageQueue = [];
   /// Variable for testing. If true, do not render the JSON recieved from the device.
   static bool testDoNotMakeTree = false;
   /// The FlutterBlue instance.
@@ -464,10 +479,6 @@ class JSONScreenState extends State<JSONScreen> {
     if(!shouldUpdate) {
       return const Text("Nothing for now...");
     }
-    Map<String, dynamic> readResponse = {};
-    if(BlueButton.messageQueue.isNotEmpty) {
-      readResponse = BlueButton.messageQueue.removeFirst();
-    }
     // Check if the bt module is trying to change the delta time.
     if(readResponse.containsKey("deltaTime")) {
       int newTimeMS = readResponse["deltaTime"] as int;
@@ -496,7 +507,6 @@ class JSONScreenState extends State<JSONScreen> {
       );
     }
 
-    printInfo("Response");
     if(readResponse.isEmpty) {
       return const Text("No response yet.");
     }

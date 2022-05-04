@@ -163,6 +163,18 @@ class MainHomePageState extends State<MainHomePage> {
 class RunData {
   RunData({required this.distance, required this.heartRate});
 
+  static RunData fromDatums(List<RunDatum> rds) {
+    var distance = List<int>.filled(rds.length, 0);
+    var heartRate = List<int>.filled(rds.length, 0);
+
+    for(int i = 0; i < rds.length; i++){
+      distance[i] = rds[i].dist;
+      heartRate[i] = rds[i].hr;
+    }
+
+    return RunData(distance: distance, heartRate: heartRate);
+  }
+
   int sum() {
     int sum = 0;
     for(var v in distance) {
@@ -172,11 +184,19 @@ class RunData {
   }
 
   int distAvg() {
-    return distance.map((m) => m).average.toInt();
+    try {
+      return distance.map((m) => m).average.toInt();
+    } catch(e) {
+      return 0;
+    }
   }
 
   int hrAvg() {
-    return heartRate.map((m) => m).average.toInt();
+    try {
+      return heartRate.map((m) => m).average.toInt();
+    } catch(e) {
+      return 0;
+    }
   }
 
   void clear() {
@@ -214,6 +234,7 @@ class ApplicationState extends ChangeNotifier {
   }
 
   NeatPeriodicTaskScheduler? testSched;
+  NeatPeriodicTaskScheduler? readSched;
 
   /// 
   Future<void> purgeAndCalc() {
@@ -393,6 +414,22 @@ class ApplicationState extends ChangeNotifier {
       task: () async {
         sendRunData(RunData(distance: [rng.nextInt(69), rng.nextInt(420)],
             heartRate: [rng.nextInt(69), rng.nextInt(420)]));
+
+      },
+      interval: const Duration(milliseconds: 10000),
+      minCycle: const Duration(milliseconds: 10000 ~/ 2 - 1),
+      name: 'bt-reader',
+      timeout: const Duration(milliseconds: 10000 * 2),
+    );
+
+    readSched = NeatPeriodicTaskScheduler(
+      task: () async {
+        // TODO
+        printInfo(
+          'length of message q is ${BlueButton.messageQueue.length}'
+        );
+        sendRunData(RunData.fromDatums(BlueButton.messageQueue));
+        BlueButton.messageQueue.clear();
       },
       interval: const Duration(milliseconds: 10000),
       minCycle: const Duration(milliseconds: 10000 ~/ 2 - 1),
@@ -401,6 +438,7 @@ class ApplicationState extends ChangeNotifier {
     );
 
     //testSched!.start();
+    readSched!.start();
   }
 
   void startLoginFlow() {
@@ -673,6 +711,14 @@ class _UserFormState extends State<UserForm> {
       )
     ]
   );
+}
+
+
+class RunDatum {
+  RunDatum({required this.hr, required this.dist});
+
+  int hr;
+  int dist;
 }
 
 /// User metadata to draw.
