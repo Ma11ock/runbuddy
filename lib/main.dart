@@ -5,6 +5,9 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:neat_periodic_task/neat_periodic_task.dart';
 import 'package:collection/collection.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:cron/cron.dart';
+
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -26,10 +29,38 @@ import './widgets.dart';
 
 var rng = Random();
 
-void main() => runApp(ChangeNotifierProvider(
-    create: (context) => ApplicationState(),
-    builder: (context, _) => const Runbuddy(),
-));
+void main() async {
+  AwesomeNotifications().initialize(
+    null, // icon for your app notification
+    [
+      NotificationChannel(
+        channelKey: 'key1',
+        channelName: 'Proto Coders Point',
+        channelDescription: "Notification example",
+        defaultColor: Color(0XFF9050DD),
+        ledColor: Colors.white,
+        playSound: true,
+        enableLights:true,
+        enableVibration: true
+      )
+    ]
+  );
+
+  final cron = Cron();
+  cron.schedule(Schedule.parse('*/1 * * * * *'), () async => {
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: 1,
+          channelKey: 'key1',
+          title:'Run Buddy Reminder',
+          body: 'Make sure you get up and run today! You got this!'))
+  });
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(ChangeNotifierProvider(
+      create: (context) => ApplicationState(),
+      builder: (context, _) => const Runbuddy(),
+  ));
+}
 
 class Runbuddy extends StatelessWidget {
   const Runbuddy({Key? key}) : super(key: key);
@@ -110,6 +141,14 @@ class MainHomePageState extends State<MainHomePage> {
 class RunData {
   RunData({required this.distance, required this.heartRate});
 
+  int sum() {
+    int sum = 0;
+    for(var v in distance) {
+      sum += v;
+    }
+    return sum;
+  }
+
   int distAvg() {
     return distance.map((m) => m).average.toInt();
   }
@@ -165,6 +204,14 @@ class ApplicationState extends ChangeNotifier {
         'distanceTot' : FieldValue.arrayUnion([runData.distAvg()]),
         'heartRateTot' : FieldValue.arrayUnion([runData.hrAvg()]),
     }).catchError((error) => throw Exception("Failed to add run data: $error"));
+    FirebaseFirestore.instance
+    .collection('userData')
+    .doc(FirebaseAuth.instance.currentUser!.email)
+    .update(<String, dynamic> {
+        'distanceTraveledM' : FieldValue.increment(runData.sum()),
+        'avgHeartRate' : runData.hrAvg(),
+    }).catchError((error) => throw Exception("Failed to add run data: $error"));
+
     runData.clear();
     return result;
   }
@@ -290,6 +337,7 @@ class ApplicationState extends ChangeNotifier {
                     email: (document.get('email') ?? 0) as String,
                     numSteps: (document.get('numSteps') ?? 0) as int,
                     stepCM: (document.get('stepCM') ?? 0) as int,
+                    heartRate: (document.get('avgHeartRate') ?? 0) as int,
                     lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.get('timestamp') ?? 0 as int),
                     distanceTraveled: (document.get('distanceTraveledM') ?? 0) as int,
                     groupMates: List<String>.from((document.get('groupMates') ?? []) as List<dynamic>),
@@ -460,7 +508,7 @@ class _UserFormState extends State<UserForm> {
                 child: TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
-                    hintText: 'Enter an email address.',
+                    hintText: 'Enter an email to invite group',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -500,7 +548,7 @@ class _UserFormState extends State<UserForm> {
                 child: TextFormField(
                   controller: _groupController,
                   decoration: const InputDecoration(
-                    hintText: 'Please enter an email to add to the group',
+                    hintText: 'Enter an email to join a group',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -540,7 +588,7 @@ class _UserFormState extends State<UserForm> {
                 child: TextFormField(
                   controller: _strideController,
                   decoration: const InputDecoration(
-                    hintText: 'Please enter your walking stride.',
+                    hintText: 'Enter your walking stride.',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -570,11 +618,37 @@ class _UserFormState extends State<UserForm> {
           ),
         ),
       ),
-      const SizedBox(height: 8),
-      for (var message in widget.messages)
-        Paragraph('${message.toString()}'),
-      Paragraph(widget.runData.toString()),
-      const SizedBox(height: 8),
+      ListView.separated(
+        shrinkWrap: true, // use this
+        separatorBuilder: (_, __) => Divider(),
+        itemCount: widget.messages.length,
+        itemBuilder: (_, index) {
+          var message = widget.messages[index];
+          return Card(
+            child: Column(
+              children: <Widget>[
+                Center(
+                  child: Text(message.name, style: const TextStyle(fontSize: 24.0)),
+                ),
+                Text(
+                  'Distance Traveled: ${message.distanceTraveled}'
+                ),
+                Text(
+                  'Avg Heart Rate: ${message.heartRate}'
+                ),
+                Text(
+                  'Set user stride: ${message.stepCM}'
+                ),
+                Text(
+                  'Time last updated: ${UserInfoMessage.formatter.format(message.lastUpdated)}'
+                ),
+                Text('Team mates:'),
+                Text('${message.groupMates}')
+              ],
+            )
+          );
+        }
+      )
     ]
   );
 }
@@ -583,17 +657,18 @@ class _UserFormState extends State<UserForm> {
 class UserInfoMessage {
   UserInfoMessage({required this.name, required this.email, required this.numSteps,
       required this.stepCM, required this.lastUpdated, required this.distanceTraveled,
-      required this.groupMates});
+      required this.heartRate, required this.groupMates});
   final String name;
   final String email;
   final int numSteps;
   final int stepCM;
   final DateTime lastUpdated;
   final int distanceTraveled;
+  final int heartRate;
   final List<String> groupMates;
+  static final DateFormat formatter = DateFormat('yyyy-MM-dd:mm');
 
   String toString() {
-    final DateFormat formatter = DateFormat('yyyy-MM-dd:mm');
     return '$name : $email $numSteps $stepCM ${formatter.format(lastUpdated)} $distanceTraveled $groupMates';
   }
 }
