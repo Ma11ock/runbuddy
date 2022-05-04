@@ -28,6 +28,7 @@ import './blue.dart';
 import './widgets.dart';
 
 var rng = Random();
+bool valueNotif = true;
 
 void main() async {
   AwesomeNotifications().initialize(
@@ -48,12 +49,14 @@ void main() async {
 
   final cron = Cron();
   cron.schedule(Schedule.parse('*/1 * * * * *'), () async => {
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: 1,
-          channelKey: 'key1',
-          title:'Run Buddy Reminder',
-          body: 'Make sure you get up and run today! You got this!'))
+      if (valueNotif==true){
+        await AwesomeNotifications().createNotification(
+          content: NotificationContent(
+            id: 1,
+            channelKey: 'key1',
+            title:'Run Buddy Reminder',
+            body: 'Make sure you get up and run today! You got this!'))
+      }
   });
   WidgetsFlutterBinding.ensureInitialized();
   runApp(ChangeNotifierProvider(
@@ -96,6 +99,13 @@ class MainHomePageState extends State<MainHomePage> {
           onPressed: () {
             Navigator.pushNamed(context, '/blue');
         }),
+        Transform.scale(
+          scale: 2,
+          child: Switch(
+            value: valueNotif,
+            onChanged: (value) => setState(() => valueNotif = value),
+          ),
+        ),
         Consumer<ApplicationState>(
           builder: (context, appState, _) => BlueButton(() {
               appState.purgeAndCalc();
