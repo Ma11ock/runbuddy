@@ -245,30 +245,11 @@ class ApplicationState extends ChangeNotifier {
     }
 
     // Add metadata entry.
-    // TODO do this on account creation.
-    FirebaseFirestore.instance
+    return FirebaseFirestore.instance
     .collection('userData')
     .doc(FirebaseAuth.instance.currentUser!.email)
-    .set(<String, dynamic> {
+    .update(<String, dynamic> {
         'stepCM' : iStep,
-        'numSteps' : 0,
-        'distanceTraveledM' : 0,
-        'avgHeartRate' : 0,
-        'timestamp' : DateTime.now().millisecondsSinceEpoch,
-        'email': FirebaseAuth.instance.currentUser!.email,
-        'name': FirebaseAuth.instance.currentUser!.displayName,
-        'userId': FirebaseAuth.instance.currentUser!.uid,
-        'groupMates' : [],
-        'allowedEmails' : [],
-    }).catchError((error) => throw Exception("Failed to add document: $error"));
-
-    // Add rundata entry.
-    return FirebaseFirestore.instance
-    .collection('runData')
-    .doc(FirebaseAuth.instance.currentUser!.email)
-    .set(<String, dynamic> {
-        'distance': [0],
-        'heartRate': [0],
     }).catchError((error) => throw Exception("Failed to add document: $error"));
   }
 
@@ -300,18 +281,18 @@ class ApplicationState extends ChangeNotifier {
               _userMessages = [];
               for(final document in snapshot.docs) {
                 // Exclude user messages we're not subscribed to.
-                if(document.data()['email'] != FirebaseAuth.instance.currentUser!.email &&
-                  !allowedEmails.contains(document.data()['email'] ?? "-")) {
+                if((document.get('email') ?? "-") != FirebaseAuth.instance.currentUser!.email &&
+                  !allowedEmails.contains(document.get('email') ?? "-")) {
                   continue;
                 }
                 userMessages.add(UserInfoMessage(
-                    name: document.data()['name'] as String,
-                    email: document.data()['email'] as String,
-                    numSteps: document.data()['numSteps'] as int,
-                    stepCM: document.data()['stepCM'] as int,
-                    lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.data()['timestamp'] as int),
-                    distanceTraveled: document.data()['distanceTraveledM'] as int,
-                    groupMates: List<String>.from(document.data()['groupMates'] as List<dynamic>),
+                    name: (document.get('name') ?? "") as String,
+                    email: (document.get('email') ?? 0) as String,
+                    numSteps: (document.get('numSteps') ?? 0) as int,
+                    stepCM: (document.get('stepCM') ?? 0) as int,
+                    lastUpdated: DateTime.fromMillisecondsSinceEpoch(document.get('timestamp') ?? 0 as int),
+                    distanceTraveled: (document.get('distanceTraveledM') ?? 0) as int,
+                    groupMates: List<String>.from((document.get('groupMates') ?? []) as List<dynamic>),
                 ));
               }
               notifyListeners();
@@ -323,10 +304,10 @@ class ApplicationState extends ChangeNotifier {
           .doc(FirebaseAuth.instance.currentUser!.email)
           .snapshots()
           .listen((snapshot) async {
-              _runData.distance = List<int>.from(snapshot.data()!['distance'] ?? [0]);
-              _runData.heartRate = List<int>.from(snapshot.data()!['heartRate'] ?? [0]);
-              runDistAvgs = List<int>.from(snapshot.data()!['distanceTot'] ?? [0]);
-              heartRateAvgs = List<int>.from(snapshot.data()!['hearRateAvgs'] ?? [0]);
+              _runData.distance = List<int>.from(snapshot.get('distance') ?? [0]);
+              _runData.heartRate = List<int>.from(snapshot.get('heartRate') ?? [0]);
+              runDistAvgs = List<int>.from(snapshot.get('distanceTot') ?? [0]);
+              heartRateAvgs = List<int>.from(snapshot.get('heartRateTot') ?? [0]);
               notifyListeners();
           });
         } else {
@@ -406,6 +387,33 @@ class ApplicationState extends ChangeNotifier {
       var credential = await FirebaseAuth.instance
       .createUserWithEmailAndPassword(email: email, password: password);
       await credential.user!.updateDisplayName(displayName);
+      FirebaseFirestore.instance
+      .collection('userData')
+      .doc(FirebaseAuth.instance.currentUser!.email)
+      .set(<String, dynamic> {
+          'stepCM' : 0,
+          'numSteps' : 0,
+          'distanceTraveledM' : 0,
+          'avgHeartRate' : 0,
+          'timestamp' : DateTime.now().millisecondsSinceEpoch,
+          'email': FirebaseAuth.instance.currentUser!.email,
+          'name': FirebaseAuth.instance.currentUser!.displayName,
+          'userId': FirebaseAuth.instance.currentUser!.uid,
+          'groupMates' : [],
+          'allowedEmails' : [],
+      }).catchError((error) => throw Exception("Failed to add document: $error"));
+
+      // Add rundata entry.
+      return FirebaseFirestore.instance
+      .collection('runData')
+      .doc(FirebaseAuth.instance.currentUser!.email)
+      .set(<String, dynamic> {
+          'distance': [0],
+          'heartRate': [0],
+          'distanceTot': [0],
+          'heartRateTot': [0],
+      }).catchError((error) => throw Exception("Failed to add document: $error"));
+
     } on FirebaseAuthException catch (e) {
       errorCallback(e);
     }
