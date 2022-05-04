@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:neat_periodic_task/neat_periodic_task.dart';
+import 'package:collection/collection.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -56,16 +57,19 @@ class MainHomePage extends StatefulWidget {
 class MainHomePageState extends State<MainHomePage> {
   @override
   Widget build(BuildContext context) => Scaffold(
-    floatingActionButton: BlueButton(),
     appBar: AppBar(title: const Text('Main App')),
     body: Column(
       children: [
-        const Text('This is some test text'),
         RaisedButton(
           child: const Text('Go to Bluetooth'),
           onPressed: () {
             Navigator.pushNamed(context, '/blue');
         }),
+        Consumer<ApplicationState>(
+          builder: (context, appState, _) => BlueButton(() {
+              appState.purgeAndCalc();
+          }),
+        ),
         Consumer<ApplicationState>(
           builder: (context, appState, _) => Authentication(
             email: appState.email,
@@ -106,6 +110,19 @@ class MainHomePageState extends State<MainHomePage> {
 class RunData {
   RunData({required this.distance, required this.heartRate});
 
+  int distAvg() {
+    return distance.map((m) => m).average.toInt();
+  }
+
+  int hrAvg() {
+    return heartRate.map((m) => m).average.toInt();
+  }
+
+  void clear() {
+    distance = [];
+    heartRate = [];
+  }
+
   /// Distance traveled since last bluetooth transmission.
   List<int> distance = [];
   /// User's current heart rate from last transmission.
@@ -127,6 +144,8 @@ class ApplicationState extends ChangeNotifier {
   StreamSubscription<DocumentSnapshot>? _dataSubscription;
   List<UserInfoMessage> _userMessages = [];
   List<UserInfoMessage> get userMessages => _userMessages;
+  List<int> runDistAvgs = [];
+  List<int> heartRateAvgs = [];
   final RunData _runData = RunData(distance: [], heartRate: []);
   RunData get runData => _runData;
   ApplicationState() {
@@ -134,6 +153,21 @@ class ApplicationState extends ChangeNotifier {
   }
 
   NeatPeriodicTaskScheduler? testSched;
+
+  /// 
+  Future<void> purgeAndCalc() {
+    var result = FirebaseFirestore.instance
+    .collection('runData')
+    .doc(FirebaseAuth.instance.currentUser!.email)
+    .update(<String, dynamic> {
+        'distance' : [0],
+        'heartRate' : [0],
+        'distanceTot' : FieldValue.arrayUnion([runData.distAvg()]),
+        'heartRateTot' : FieldValue.arrayUnion([runData.hrAvg()]),
+    }).catchError((error) => throw Exception("Failed to add run data: $error"));
+    runData.clear();
+    return result;
+  }
 
   /// Send the run data [rd] to the Firestore.
   Future<void> sendRunData(RunData rd) {
@@ -211,6 +245,7 @@ class ApplicationState extends ChangeNotifier {
     }
 
     // Add metadata entry.
+    // TODO do this on account creation.
     FirebaseFirestore.instance
     .collection('userData')
     .doc(FirebaseAuth.instance.currentUser!.email)
@@ -242,13 +277,13 @@ class ApplicationState extends ChangeNotifier {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Get user metadata and filter by group.
     FirebaseAuth.instance.userChanges().listen((user) {
         if (user != null) {
           _loginState = ApplicationLoginState.loggedIn;
           _userMessageSubscription = FirebaseFirestore.instance
           .collection('userData')
           .snapshots()
+          // Get user metadata and filter by group.
           .listen((snapshot) async {
               List<String> allowedEmails = [];
               try {
@@ -281,18 +316,7 @@ class ApplicationState extends ChangeNotifier {
               }
               notifyListeners();
           });
-        } else {
-          _loginState = ApplicationLoginState.loggedOut;
-          _userMessages = [];
-          _userMessageSubscription?.cancel();
-          _dataSubscription?.cancel();
-        }
-        notifyListeners();
-    });
 
-    // Subscribe to our data stream.
-    FirebaseAuth.instance.userChanges().listen((user) {
-        if (user != null) {
           // Subscribe to our data stream.
           _dataSubscription = FirebaseFirestore.instance
           .collection('runData')
@@ -301,6 +325,9 @@ class ApplicationState extends ChangeNotifier {
           .listen((snapshot) async {
               _runData.distance = List<int>.from(snapshot.data()!['distance'] ?? [0]);
               _runData.heartRate = List<int>.from(snapshot.data()!['heartRate'] ?? [0]);
+              runDistAvgs = List<int>.from(snapshot.data()!['distanceTot'] ?? [0]);
+              heartRateAvgs = List<int>.from(snapshot.data()!['hearRateAvgs'] ?? [0]);
+              notifyListeners();
           });
         } else {
           _loginState = ApplicationLoginState.loggedOut;
@@ -322,7 +349,7 @@ class ApplicationState extends ChangeNotifier {
       timeout: const Duration(milliseconds: 10000 * 2),
     );
 
-    //testSched!.start();
+    testSched!.start();
   }
 
   void startLoginFlow() {
